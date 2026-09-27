@@ -1,0 +1,512 @@
+// BizBooks data model (PostgreSQL: Supabase in production, `prisma dev` locally).
+// Enum-like fields are stored as strings; allowed values live in src/lib/constants.ts.
+// Money is stored in naira as Float and rounded to 2 decimal places on every write (see lib/money.ts).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  fullName     String
+  phone        String?
+  lastSeenAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  business Business?
+}
+
+model Business {
+  id       String  @id @default(cuid())
+  ownerId  String  @unique
+  owner    User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  // Trading name on invoices; legalName is the CAC-registered name if different.
+  name     String
+  legalName String?
+  // LTD | BN | PARTNERSHIP | SOLE | NGO
+  entityType String @default("LTD")
+  rcNumber String?
+  teamSize String?
+  industry String?
+  email    String?
+  phone    String?
+  address  String?
+  city     String?
+  state    String?
+  logo     String? // small data URL (≤ 200 KB)
+  brandColor String @default("#0E7A55")
+
+  currency         String  @default("NGN")
+  tin              String?
+  vatRegistered    Boolean @default(false)
+  // Professional services firms can't use the small-company income tax exemption.
+  professionalServices Boolean @default(false)
+  // Day of the month salaries are usually paid.
+  payDay           Int     @default(25)
+  vatRate          Float   @default(7.5)
+  invoicePrefix    String  @default("INV")
+  nextInvoiceNo    Int     @default(1)
+  quotePrefix      String  @default("QT")
+  nextQuoteNo      Int     @default(1)
+  paymentTermsDays Int     @default(30)
+  invoiceFooter    String?
+  autoReminders    Boolean @default(true)
+
+  // Onboarding wizard: the last completed step, and when the owner finished or skipped it.
+  onboardingStep Int       @default(0)
+  onboardedAt    DateTime?
+
+  // Platform subscription. FREE | PRO. Pro access runs until proUntil.
+  plan            String    @default("FREE")
+  proUntil        DateTime?
+  pausedUntil     DateTime?
+  cancelAtEnd     Boolean   @default(false)
+  // Save-offer discount applied to renewals until discountUntil.
+  discountPercent Int       @default(0)
+  discountUntil   DateTime?
+  renewalNoticeAt DateTime?
+  lastNudgeAt     DateTime?
+  lastActiveAt    DateTime  @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bankAccounts  BankAccount[]
+  gateways      Gateway[]
+  customers     Customer[]
+  items         Item[]
+  invoices      Invoice[]
+  payments      Payment[]
+  recurring     RecurringSchedule[]
+  expenses      Expense[]
+  recurringExpenses RecurringExpense[]
+  employees     Employee[]
+  payRuns       PayRun[]
+  subscriptions PlatformPayment[]
+  feedback      CancellationFeedback[]
+  taxFilings    TaxFiling[]
+}
+
+model BankAccount {
+  id            String   @id @default(cuid())
+  businessId    String
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  bankName      String
+  accountName   String
+  accountNumber String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([businessId])
+}
+
+// The business's own gateway account. Money goes straight from the customer to the business;
+// BizBooks never holds funds. Secret keys are encrypted at rest (lib/crypto.ts).
+model Gateway {
+  id           String    @id @default(cuid())
+  businessId   String
+  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  // PAYSTACK | FLUTTERWAVE
+  provider     String
+  publicKey    String?
+  secretKeyEnc String
+  // Flutterwave only: the "secret hash" set on the Flutterwave dashboard for webhook checks.
+  webhookHashEnc String?
+  // TEST | LIVE, read from the key prefix.
+  mode         String
+  enabled      Boolean   @default(true)
+  verifiedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([businessId, provider])
+}
+
+model Customer {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name       String
+  contactName String?
+  email      String?
+  phone      String?
+  address    String?
+  tin        String?
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  invoices  Invoice[]
+  recurring RecurringSchedule[]
+
+  @@index([businessId])
+}
+
+// Saved products and services, so repeat items take one tap.
+model Item {
+  id          String   @id @default(cuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  unitPrice   Float
+  createdAt   DateTime @default(now())
+
+  @@index([businessId])
+}
+
+model Invoice {
+  id          String    @id @default(cuid())
+  businessId  String
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  // INVOICE | QUOTE
+  kind        String    @default("INVOICE")
+  number      String
+  // The client's purchase order or reference. Corporate clients often won't pay without it.
+  poNumber    String?
+  // Quotes: share of the quote the client pays up front when they accept it online.
+  depositPercent Int?
+  acceptedAt  DateTime?
+  acceptedBy  String?
+  // Deposit invoices point at the quote they came from.
+  depositForId String?
+  // DRAFT | SENT | PARTIAL | PAID | VOID (quotes: DRAFT | SENT | ACCEPTED | CONVERTED | VOID)
+  status      String    @default("DRAFT")
+  issueDate   DateTime  @default(now())
+  dueDate     DateTime
+  currency    String    @default("NGN")
+  subtotal    Float
+  discount    Float     @default(0)
+  vatRate     Float     @default(0)
+  vatAmount   Float     @default(0)
+  // Withholding tax the customer will deduct at source. Shown on the invoice; reduces the amount due.
+  whtRate     Float     @default(0)
+  whtAmount   Float     @default(0)
+  total       Float
+  amountPaid  Float     @default(0)
+  notes       String?
+  publicToken String    @unique
+  sentAt      DateTime?
+  viewedAt    DateTime?
+  paidAt      DateTime?
+  lastReminderAt DateTime?
+  reminderCount  Int    @default(0)
+  recurringId String?
+  recurring   RecurringSchedule? @relation(fields: [recurringId], references: [id], onDelete: SetNull)
+  convertedFromId String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  items    InvoiceItem[]
+  payments Payment[]
+  events   InvoiceEvent[]
+  claims   PaymentClaim[]
+
+  @@unique([businessId, kind, number])
+  @@index([businessId, status])
+  @@index([businessId, dueDate])
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Float
+  unitPrice   Float
+  amount      Float
+  position    Int     @default(0)
+}
+
+model InvoiceEvent {
+  id        String   @id @default(cuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  // CREATED | SENT | VIEWED | REMINDER | PAYMENT | CLAIM | VOID | CONVERTED
+  type      String
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([invoiceId])
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  invoiceId  String?
+  invoice    Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  amount     Float
+  // BANK_TRANSFER | CASH | POS | PAYSTACK | FLUTTERWAVE | OTHER
+  method     String
+  // Gateway reference. Unique so a webhook and a redirect can't record the same payment twice.
+  reference  String?  @unique
+  paidAt     DateTime @default(now())
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([businessId, paidAt])
+}
+
+// A customer's "I've sent the transfer" note, waiting for the owner to confirm against their bank app.
+model PaymentClaim {
+  id        String   @id @default(cuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount    Float
+  payerName String
+  note      String?
+  // PENDING | CONFIRMED | REJECTED
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+
+  @@index([invoiceId])
+}
+
+model RecurringSchedule {
+  id           String    @id @default(cuid())
+  businessId   String
+  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customerId   String
+  customer     Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  title        String
+  // WEEKLY | MONTHLY | QUARTERLY | YEARLY
+  frequency    String
+  nextRunAt    DateTime
+  endAt        DateTime?
+  maxRuns      Int?
+  runs         Int       @default(0)
+  autoSend     Boolean   @default(true)
+  dueInDays    Int       @default(7)
+  // ACTIVE | PAUSED | ENDED
+  status       String    @default("ACTIVE")
+  // Invoice template: [{ description, quantity, unitPrice }]
+  items        Json
+  discount     Float     @default(0)
+  vatRate      Float     @default(0)
+  whtRate      Float     @default(0)
+  notes        String?
+  lastRunAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  invoices Invoice[]
+
+  @@index([status, nextRunAt])
+}
+
+model Expense {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  date       DateTime
+  amount     Float
+  category   String
+  vendor     String?
+  note       String?
+  // VAT included in the amount, if the supplier charged it (input VAT).
+  vatAmount  Float    @default(0)
+  method     String   @default("BANK_TRANSFER")
+  // Small compressed photo of the receipt (data URL).
+  receipt    String?
+  // Bills: recorded now, paid later. Cash-flow figures count an expense on the day it's paid.
+  paid       Boolean   @default(true)
+  dueDate    DateTime?
+  paidAt     DateTime?
+  recurringExpenseId String?
+  recurringExpense   RecurringExpense? @relation(fields: [recurringExpenseId], references: [id], onDelete: SetNull)
+  payRunId   String?
+  payRun     PayRun?  @relation(fields: [payRunId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([businessId, date])
+}
+
+// Fixed costs entered once: office rent, software subscriptions, internet, retainers.
+model RecurringExpense {
+  id         String    @id @default(cuid())
+  businessId String
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  title      String
+  category   String
+  vendor     String?
+  amount     Float
+  vatAmount  Float     @default(0)
+  method     String    @default("BANK_TRANSFER")
+  // WEEKLY | MONTHLY | QUARTERLY | YEARLY
+  frequency  String
+  nextRunAt  DateTime
+  endAt      DateTime?
+  // true: arrives as an unpaid bill to approve and pay; false: logged as already paid (e.g. card subscriptions).
+  asBill     Boolean   @default(false)
+  dueInDays  Int       @default(0)
+  // ACTIVE | PAUSED | ENDED
+  status     String    @default("ACTIVE")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  expenses Expense[]
+
+  @@index([status, nextRunAt])
+}
+
+model Employee {
+  id            String    @id @default(cuid())
+  businessId    String
+  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  fullName      String
+  email         String?
+  phone         String?
+  jobTitle      String?
+  // EMPLOYEE (PAYE + pension) | CONTRACTOR (withholding tax, no pension)
+  kind          String    @default("EMPLOYEE")
+  // Contractors: WHT deducted from each payment.
+  whtRate       Float     @default(5)
+  // Monthly gross pay (basic + housing + transport + other allowances).
+  monthlyGross  Float
+  // Annual rent the employee has declared, for the NTA 2025 rent relief.
+  annualRent    Float     @default(0)
+  pension       Boolean   @default(true)
+  pensionPin    String?
+  pfa           String?
+  nhf           Boolean   @default(false)
+  bankName      String?
+  accountNumber String?
+  accountName   String?
+  startDate     DateTime?
+  // ACTIVE | LEFT
+  status        String    @default("ACTIVE")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  payItems PayItem[]
+
+  @@index([businessId, status])
+}
+
+// One month's payroll. BizBooks works it out; the business pays through its own bank.
+model PayRun {
+  id              String    @id @default(cuid())
+  businessId      String
+  business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  // "2026-10"
+  period          String
+  payDate         DateTime
+  // DRAFT | PAID
+  status          String    @default("DRAFT")
+  gross           Float     @default(0)
+  paye            Float     @default(0)
+  pensionEmployee Float     @default(0)
+  pensionEmployer Float     @default(0)
+  nhf             Float     @default(0)
+  wht             Float     @default(0)
+  net             Float     @default(0)
+  paidAt          DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  items    PayItem[]
+  expenses Expense[]
+
+  @@unique([businessId, period])
+}
+
+model PayItem {
+  id              String   @id @default(cuid())
+  payRunId        String
+  payRun          PayRun   @relation(fields: [payRunId], references: [id], onDelete: Cascade)
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  // Snapshots, so past payslips don't change when an employee's details do.
+  fullName        String
+  jobTitle        String?
+  bankName        String?
+  accountNumber   String?
+  accountName     String?
+  gross           Float
+  pensionEmployee Float
+  pensionEmployer Float
+  nhf             Float
+  rentRelief      Float
+  paye            Float
+  wht             Float    @default(0)
+  kind            String   @default("EMPLOYEE")
+  net             Float
+  // Link for the employee's own payslip page.
+  publicToken     String   @unique
+
+  @@index([payRunId])
+}
+
+// Payments for the BizBooks Pro plan itself, charged with the platform's own Paystack account.
+model PlatformPayment {
+  id         String    @id @default(cuid())
+  businessId String
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  reference  String    @unique
+  amount     Float
+  months     Int
+  // PENDING | PAID | FAILED
+  status     String    @default("PENDING")
+  paidAt     DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+model CancellationFeedback {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  reason     String
+  details    String?
+  offer      String?
+  // SAVED_DISCOUNT | SAVED_PAUSE | SAVED_HELP | CANCELLED
+  outcome    String
+  createdAt  DateTime @default(now())
+}
+
+// The owner's note that a tax was remitted, so the calendar stops reminding them.
+model TaxFiling {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  // VAT | PAYE | PENSION | WHT
+  kind       String
+  // "2026-09": the month the tax relates to
+  period     String
+  amount     Float
+  reference  String?
+  paidAt     DateTime @default(now())
+
+  @@unique([businessId, kind, period])
+}
+
+// Requests for done-for-you bookkeeping, tax and payroll from the BizBooks advisory team.
+model AdvisorRequest {
+  id          String   @id @default(cuid())
+  businessId  String?
+  companyName String
+  contactName String
+  email       String
+  phone       String?
+  // Comma-separated service keys (BOOKKEEPING, TAX, PAYROLL, CFO, CLEANUP)
+  services    String
+  teamSize    String?
+  message     String?
+  // WEBSITE | APP
+  source      String   @default("WEBSITE")
+  // NEW | CONTACTED | WON | LOST
+  status      String   @default("NEW")
+  createdAt   DateTime @default(now())
+
+  @@index([status, createdAt])
+}

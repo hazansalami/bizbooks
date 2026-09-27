@@ -1,0 +1,57 @@
+# BizBooks
+
+> Accounting, invoicing, payroll and tax tracking for registered Nigerian companies (agencies, consultancies, IT and B2B service firms). A dashboard shows cash flow, profit, receivables and payables, and upcoming payroll and tax deadlines. Clients pay through the company's own Paystack or Flutterwave account or by bank transfer; BizBooks never holds customer money.
+
+## Stay organized & tax-ready
+- Dashboard: cash flow, profit and loss (accrual), expense breakdown, net income by year, aged receivables and payables
+- Expenses with receipt photos, bills (unpaid supplier invoices) and recurring expenses
+- Reports: Profit & Loss (accrual or cash), Cash Flow, VAT, Income by Client, Aged Receivables, Client Deposits, Purchases by Supplier, Aged Payables, Payroll Summary, All Transactions
+- Tax calendar for VAT (21st), PAYE (10th), pension (7 working days after pay day) and withholding tax, using the Nigeria Tax Act 2025 rules from 2026
+
+## Get paid
+- Invoices with CAC/RC number, TIN, client PO number, 7.5% VAT and 2%/5%/10% WHT, amount in words
+- Quotes clients accept online, with optional deposits credited on the final invoice
+- Recurring invoices and automatic reminders
+- Online payments through the company's own Paystack or Flutterwave keys (encrypted)
+
+## Pay your team
+- Payroll for staff (PAYE, 8%/10% pension, NHF, rent relief) and contractors (withholding tax)
+- Payslips, bank bulk-transfer schedule (CSV), and automatic salary expense entries
+
+## Pricing
+- Free: invoicing, payments, expenses, dashboard, tax tracking, payroll for up to 3 people
+- Pro: unlimited recurring items, full payroll with emailed payslips, quote deposits, reminders, branding, CSV exports
+
+## Advisors (done-for-you service)
+- Outsourced monthly bookkeeping, tax & compliance filings, payroll management, fractional CFO and catch-up bookkeeping by the BizBooks advisory team. Free consultation: /advisors
+
+## Guides (Insights)
+- [Nigeria Tax Act 2025 explained for companies](/insights/nigeria-tax-act-2025-explained-for-companies)
+- [Small company tax exemption (0% CIT)](/insights/small-company-tax-exemption-nigeria)
+- [VAT for service companies](/insights/vat-in-nigeria-for-service-companies)
+- [Withholding tax rates 2026](/insights/withholding-tax-in-nigeria)
+- [Nigeria tax calendar 2026](/insights/nigeria-tax-calendar-2026)
+- [How to calculate PAYE (2026 bands)](/insights/how-to-calculate-paye-in-nigeria)
+- [Payroll: first-time employer guide](/insights/payroll-in-nigeria-first-time-employer-guide)
+- [Employee or contractor?](/insights/employee-or-contractor-nigeria)
+- [Professional invoice checklist](/insights/how-to-write-a-professional-invoice-in-nigeria)
+- [Getting clients to pay on time](/insights/how-to-get-clients-to-pay-on-time)
+- [Mobilisation fees and deposits](/insights/mobilisation-fees-and-deposits)
+- [Month-end bookkeeping checklist](/insights/month-end-bookkeeping-checklist)
+- [Profit and loss explained](/insights/profit-and-loss-statement-explained)
+- [Wave in Nigeria: your options](/insights/wave-invoicing-nigeria-options)
+- [Finance and tax glossary](/insights/business-finance-glossary-nigeria)
+
+## Free tools
+- [PAYE calculator 2026](/tools/paye-calculator)
+- [VAT & WHT invoice calculator](/tools/vat-wht-calculator)
+
+## Pages
+- [Home](/)
+- [Pricing](/pricing) · machine-readable: [/pricing.md](/pricing.md)
+- [Advisors](/advisors)
+- [Insights](/insights)
+- [Solutions: Bookkeeping & reports](/solutions/accounting)
+- [Solutions: Payroll](/solutions/payroll)
+- [Solutions: Tax tracking](/solutions/taxes)
+- [Solutions: Invoicing](/solutions/invoicing)
