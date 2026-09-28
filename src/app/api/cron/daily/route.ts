@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { runSchedule } from "@/lib/recurring";
 import { runRecurringExpense } from "@/lib/recurring-expenses";
+import { runNurture } from "@/lib/nurture";
 import { emailInvoice, loadFullInvoice } from "@/lib/invoices";
 import { isPro } from "@/lib/plan";
 import { layout, sendEmail } from "@/lib/email";
@@ -140,5 +141,14 @@ export async function GET(request: NextRequest) {
     out.nudges++;
   }
 
-  return NextResponse.json({ ok: true, ...out });
+  // 5. Calculator lead nurture emails (lib/nurture.ts).
+  let nurture = { sent: 0, converted: 0, completed: 0 };
+  try {
+    nurture = await runNurture(now);
+  } catch (e) {
+    out.errors++;
+    console.error("nurture", e);
+  }
+
+  return NextResponse.json({ ok: true, ...out, nurture });
 }

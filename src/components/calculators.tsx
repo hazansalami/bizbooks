@@ -73,7 +73,7 @@ function EmailResults({ tool, lines, inputs }: { tool: string; lines: Line[]; in
         <SubmitButton size="sm" pending={pending} pendingText="Sending…" className="min-h-11">Send</SubmitButton>
       </div>
       {(state.errors?.email || state.message) && <p role="alert" className="mt-1.5 text-sm text-danger">{state.errors?.email ?? state.message}</p>}
-      <p className="mt-1.5 text-xs text-muted">Plus a free guide to go with it. No spam, and we never share your email. See our <a href="/privacy" className="underline">Privacy Policy</a>.</p>
+      <p className="mt-1.5 text-xs text-muted">Plus a free guide, and a few short follow-up guides over the next two weeks. Unsubscribe any time. We never share your email (<a href="/privacy" className="underline">Privacy Policy</a>).</p>
     </form>
   );
 }

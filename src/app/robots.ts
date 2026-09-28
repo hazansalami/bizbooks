@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { siteUrl } from "@/lib/site-url";
 
-const PRIVATE = ["/app", "/onboarding", "/i/", "/pay/", "/payslip/", "/api/"];
+const PRIVATE = ["/app", "/onboarding", "/i/", "/pay/", "/payslip/", "/api/", "/unsubscribe"];
 
 // Search and AI-answer crawlers are welcome on public pages so guides can be cited; private areas stay out.
 export default function robots(): MetadataRoute.Robots {

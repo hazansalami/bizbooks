@@ -521,8 +521,19 @@ model Lead {
   tool      String
   // Inputs and results, so follow-up emails can reference them.
   data      Json
+  // Nurture sequence (lib/nurture.ts). Email 1 is the results email itself.
+  // track: PAYROLL | TAX | INVOICING, or NONE when this address is already in (or finished) a sequence.
+  track          String    @default("NONE")
+  nurtureStep    Int       @default(1)
+  nextNurtureAt  DateTime?
+  completedAt    DateTime?
+  convertedAt    DateTime?
+  unsubscribedAt DateTime?
+  // Secret for one-click unsubscribe links.
+  token     String   @unique @default(cuid())
   createdAt DateTime @default(now())
 
   @@index([email])
   @@index([tool, createdAt])
+  @@index([nextNurtureAt])
 }
