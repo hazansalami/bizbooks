@@ -76,6 +76,7 @@ export function MobileMenu({ signedIn }: { signedIn: boolean }) {
           <Groups onPick={() => setOpen(false)} />
           <div className="flex flex-col gap-2 border-t border-line pt-4">
             <Link href="/insights" onClick={() => setOpen(false)} className="rounded-xl px-3 py-2.5 font-semibold hover:bg-canvas">Resources</Link>
+            <Link href="/tools" onClick={() => setOpen(false)} className="rounded-xl px-3 py-2.5 font-semibold hover:bg-canvas">Free calculators</Link>
             <Link href="/advisors" onClick={() => setOpen(false)} className="rounded-xl px-3 py-2.5 font-semibold hover:bg-canvas">Advisors</Link>
             <Link href="/pricing" onClick={() => setOpen(false)} className="rounded-xl px-3 py-2.5 font-semibold hover:bg-canvas">Pricing</Link>
             {!signedIn && <Link href="/login" onClick={() => setOpen(false)} className="rounded-xl px-3 py-2.5 font-semibold hover:bg-canvas">Log in</Link>}

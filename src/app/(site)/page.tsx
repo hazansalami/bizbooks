@@ -6,6 +6,7 @@ import { ButtonLink } from "@/components/ui";
 import { APP_NAME } from "@/lib/constants";
 import { SOLUTIONS, SOLUTION_GROUPS } from "./solutions/data";
 import { allArticles, CATEGORIES } from "@/lib/insights";
+import { TOOLS } from "@/lib/tools";
 
 const faqs = [
   {
@@ -217,6 +218,27 @@ export default function Home() {
           <div className="flex-1">
             <h2 className="text-2xl">On your desk and in your pocket.</h2>
             <p className="mt-1 text-ink-soft">Install {APP_NAME} from your browser. Send an invoice, snap a receipt or approve payroll from your phone. No app store download.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Free calculators (lead magnets) */}
+      <section className="border-t border-line bg-brand-wash">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h2 className="text-3xl">Free calculators, updated for 2026</h2>
+              <p className="mt-2 text-ink-soft">PAYE, company tax, VAT and what a hire really costs. No sign-up.</p>
+            </div>
+            <Link href="/tools" className="font-semibold text-brand-deep hover:underline">All calculators →</Link>
+          </div>
+          <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {TOOLS.map((t) => (
+              <Link key={t.slug} href={t.href} className="group rounded-2xl bg-paper p-5 hover:shadow-md">
+                <p className="font-semibold group-hover:text-brand-deep">{t.title}</p>
+                <p className="mt-1 text-sm text-ink-soft">{t.body}</p>
+              </Link>
+            ))}
           </div>
         </div>
       </section>

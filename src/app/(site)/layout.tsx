@@ -20,6 +20,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
             <nav aria-label="Main" className="flex items-center gap-1">
               <SolutionsMenu />
               <Link href="/insights" className="hidden min-h-11 items-center rounded-full px-3 text-sm font-semibold text-ink-soft hover:text-ink md:inline-flex">Resources</Link>
+              <Link href="/tools" className="hidden min-h-11 items-center rounded-full px-3 text-sm font-semibold text-ink-soft hover:text-ink lg:inline-flex">Calculators</Link>
               <Link href="/advisors" className="hidden min-h-11 items-center rounded-full px-3 text-sm font-semibold text-ink-soft hover:text-ink lg:inline-flex">Advisors</Link>
               <Link href="/pricing" className="hidden min-h-11 items-center rounded-full px-3 text-sm font-semibold text-ink-soft hover:text-ink md:inline-flex">Pricing</Link>
             </nav>
@@ -60,13 +61,18 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
             <ul className="mt-3 space-y-2 text-sm text-muted">
               <li><Link href="/insights" className="hover:text-ink">Insights</Link></li>
               <li><Link href="/insights/nigeria-tax-calendar-2026" className="hover:text-ink">Tax calendar 2026</Link></li>
+              <li><Link href="/tools" className="hover:text-ink">Free calculators</Link></li>
               <li><Link href="/tools/paye-calculator" className="hover:text-ink">PAYE calculator</Link></li>
-              <li><Link href="/tools/vat-wht-calculator" className="hover:text-ink">VAT & WHT calculator</Link></li>
+              <li><Link href="/tools/company-income-tax-calculator" className="hover:text-ink">Company tax calculator</Link></li>
               <li><Link href="/insights/business-finance-glossary-nigeria" className="hover:text-ink">Glossary</Link></li>
             </ul>
           </div>
         </div>
-        <p className="border-t border-line py-5 text-center text-xs text-muted">© {new Date().getFullYear()} {APP_NAME}. Built in Nigeria, for Nigerian companies.</p>
+        <div className="border-t border-line py-5 text-center text-xs text-muted">
+          <p>© {new Date().getFullYear()} {APP_NAME}. Built in Nigeria, for Nigerian companies.</p>
+          <p className="mt-2 flex justify-center gap-4"><Link href="/terms" className="hover:text-ink">Terms of Service</Link><Link href="/privacy" className="hover:text-ink">Privacy Policy</Link></p>
+          <p className="mx-auto mt-2 max-w-2xl px-4">Guides and calculators are general information, not tax, legal or financial advice. Always confirm with a qualified professional.</p>
+        </div>
       </footer>
     </>
   );

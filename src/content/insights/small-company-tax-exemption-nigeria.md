@@ -62,7 +62,7 @@ It can choose to. Many corporate and government clients prefer suppliers that is
 3. Write down honestly whether any revenue comes from professional or advisory services.
 4. If you're close to either limit, look at your **trailing 12 months** every quarter, not only at year end.
 
-BizBooks shows your **trailing 12-month sales against the ₦100m limit** on the [Taxes page](/solutions/taxes), and changes its guidance if you've marked the company as providing professional services.
+Try the free [company income tax calculator](/tools/company-income-tax-calculator) to check your status in seconds. BizBooks also shows your **trailing 12-month sales against the ₦100m limit** on the [Taxes page](/solutions/taxes), and changes its guidance if you've marked the company as providing professional services.
 
 ## Frequently asked questions
 

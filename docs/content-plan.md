@@ -84,14 +84,23 @@ Status: ✅ written and live · 🔜 next
 | 35 | Outsourced bookkeeping in Nigeria: what it costs and when it's worth it | outsourced bookkeeping nigeria, accountant for small business | Consideration | 7.8 | 🔜 |
 | 36 | State of SME finance in Nigeria (original data report from anonymised BizBooks data) | nigeria sme payment delays statistics | Shareable | 7.0 | 🔜 (needs real data) |
 
-## Free tools (link-earners)
+## Free calculators (lead magnets and link-earners, at /tools)
 
-| Tool | Target searches | Status |
-|---|---|---|
-| PAYE calculator 2026 (salary → PAYE, pension, take-home) | paye calculator nigeria 2026 | ✅ |
-| VAT and WHT invoice calculator (what the client actually pays) | vat calculator nigeria, wht calculator | ✅ |
-| Invoice template (printable) | invoice template nigeria | 🔜 |
-| Payslip template | payslip template nigeria | 🔜 |
+Ungated for reach and AI citation. Each has an optional "Email me this breakdown" capture (email only) that
+sends the results plus a related guide, stored in the `Lead` table.
+
+| Calculator | Target searches | Bonus sent by email | Status |
+|---|---|---|---|
+| PAYE calculator 2026 | paye calculator nigeria 2026, how to calculate paye | PAYE guide | ✅ |
+| Net to gross salary calculator | net to gross salary nigeria, gross up salary | First-time employer guide | ✅ |
+| Cost of an employee calculator | cost of employee nigeria, employer pension nsitf itf | First-time employer guide | ✅ |
+| Company income tax calculator (small company check) | company income tax calculator nigeria, how to calculate cit, development levy | 2026 tax calendar | ✅ |
+| VAT calculator (add/remove 7.5%) | vat calculator nigeria, how to calculate vat, remove vat | VAT guide | ✅ |
+| VAT & WHT invoice calculator | wht calculator, how to calculate withholding tax | Invoice checklist | ✅ |
+| Pension (RSA) projection calculator | pension calculator nigeria | Pension guide | 🔜 |
+| Invoice and payslip templates | invoice template nigeria, payslip template | – | 🔜 |
+
+Next step: a 3-email nurture sequence for calculator leads (results → related guide → BizBooks trial), using the emails skill.
 
 ## Before publishing
 

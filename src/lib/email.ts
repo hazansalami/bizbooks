@@ -56,7 +56,12 @@ ${(opts.after ?? []).map(p).join("")}
 }
 
 function stripTags(s: string) {
-  return s.replace(/<br\s*\/?>/g, "\n").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&");
+  return s
+    .replace(/<br\s*\/?>/g, "\n")
+    .replace(/<\/td>\s*<td[^>]*>/g, ": ")
+    .replace(/<\/tr>/g, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&");
 }
 
 export { esc as escapeHtml };

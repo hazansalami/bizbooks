@@ -1,70 +1,41 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { PayeCalculator } from "@/components/calculators";
-import { ButtonLink } from "@/components/ui";
+import { ToolPage, type ToolContent } from "@/components/tool-page";
 
-const faqs = [
-  { q: "How is PAYE calculated in Nigeria in 2026?", a: "Annual gross pay minus pension (8%), NHF and rent relief gives taxable income. The first ₦800,000 is taxed at 0%, the next ₦2.2m at 15%, then 18%, 21%, 23% and 25% on higher bands. Divide by 12 for monthly PAYE." },
-  { q: "What is the tax-free amount in Nigeria?", a: "The first ₦800,000 of annual taxable income is taxed at 0% under the Nigeria Tax Act 2025, from 1 January 2026." },
-  { q: "What is rent relief?", a: "From 2026, employees can deduct 20% of the annual rent they pay, up to ₦500,000, before PAYE is calculated. It replaced the Consolidated Relief Allowance." },
-  { q: "Is this calculator accurate for my payroll?", a: "It follows the published 2026 bands and treats total gross pay as pensionable. Real payslips can differ if pension is calculated only on basic, housing and transport, or if other reliefs apply." },
-];
+const c: ToolContent = {
+  slug: "paye-calculator",
+  h1: "PAYE calculator Nigeria 2026",
+  intro: "Work out PAYE, pension and take-home pay under the new tax bands that took effect on 1 January 2026, including the ₦800,000 tax-free threshold and rent relief.",
+  howToTitle: "How to calculate PAYE in Nigeria",
+  howToIntro: "PAYE is worked out on annual taxable income using the 2026 bands in the Nigeria Tax Act 2025, then divided by 12 for the monthly deduction.",
+  steps: [
+    { name: "Find annual gross pay", text: "Monthly gross (basic + housing + transport + other taxable allowances) × 12." },
+    { name: "Subtract pension and NHF", text: "Deduct the employee's 8% pension contribution, and 2.5% NHF if they're registered." },
+    { name: "Subtract rent relief", text: "Deduct 20% of the annual rent the employee pays, up to ₦500,000, with evidence." },
+    { name: "Apply the tax bands", text: "0% on the first ₦800,000, 15% on the next ₦2.2m, 18% up to ₦12m, 21% up to ₦25m, 23% up to ₦50m and 25% above." },
+    { name: "Divide by 12", text: "The annual tax ÷ 12 is the PAYE to deduct each month and remit to the State IRS by the 10th." },
+  ],
+  example: {
+    title: "Worked example: ₦500,000 a month, ₦1.2m rent",
+    rows: [["Annual gross", "₦6,000,000"], ["Less pension (8%)", "−₦480,000"], ["Less rent relief (20% of ₦1.2m)", "−₦240,000"], ["Taxable income", "₦5,280,000"], ["Tax: 15% × ₦2.2m + 18% × ₦2.28m", "₦740,400"], ["Monthly PAYE", "₦61,700"], ["Monthly take-home", "₦398,300"]],
+  },
+  faqs: [
+    { q: "How is PAYE calculated in Nigeria in 2026?", a: "Take annual gross pay, subtract pension (8%), NHF and rent relief, then apply the bands: 0% on the first ₦800,000, 15% on the next ₦2.2m, 18% to ₦12m, 21% to ₦25m, 23% to ₦50m and 25% above. Divide by 12 for monthly PAYE." },
+    { q: "What is the tax-free threshold in Nigeria?", a: "The first ₦800,000 of annual taxable income is taxed at 0% from 1 January 2026." },
+    { q: "What is rent relief?", a: "20% of the annual rent an employee pays, up to ₦500,000, deducted before PAYE is calculated. It replaced the Consolidated Relief Allowance." },
+    { q: "Do minimum wage earners pay PAYE?", a: "Generally no. At ₦70,000 a month, taxable income after pension is below the ₦800,000 tax-free threshold." },
+    { q: "Where is PAYE paid?", a: "To the State Internal Revenue Service of the state where the employee lives, by the 10th of the following month." },
+  ],
+  articles: ["how-to-calculate-paye-in-nigeria", "payroll-in-nigeria-first-time-employer-guide", "employee-or-contractor-nigeria"],
+  cta: { title: "Running payroll for a team?", body: "BizBooks calculates PAYE, pension and NHF for everyone, creates payslips and a bank upload file, and reminds you to remit.", href: "/solutions/payroll", label: "See payroll" },
+};
 
 export const metadata: Metadata = {
-  title: "PAYE calculator Nigeria 2026: take-home pay under the new tax bands",
-  description: "Free PAYE calculator for Nigeria using the 2026 tax bands (Nigeria Tax Act 2025): enter a salary to see PAYE, pension, rent relief and take-home pay.",
+  title: "PAYE calculator Nigeria 2026: how to calculate PAYE (new tax bands)",
+  description: "Free PAYE calculator for Nigeria using the 2026 tax bands. Enter a salary to see PAYE, pension, rent relief and take-home pay, plus how to calculate PAYE step by step.",
   alternates: { canonical: "/tools/paye-calculator" },
 };
 
-export default function PayeCalculatorPage() {
-  return (
-    <>
-      <section className="mx-auto max-w-5xl px-4 pb-10 pt-12 sm:px-6">
-        <p className="text-sm font-bold uppercase tracking-widest text-brand">Free tool</p>
-        <h1 className="mt-2 text-4xl leading-[1.05] tracking-[-0.03em] sm:text-5xl">PAYE calculator for 2026</h1>
-        <p className="mt-3 max-w-2xl text-lg text-ink-soft">See PAYE, pension and take-home pay under the new tax bands that took effect on 1 January 2026, including the ₦800,000 tax-free threshold and rent relief.</p>
-        <div className="mt-8"><PayeCalculator /></div>
-      </section>
-
-      <section className="border-t border-line bg-paper">
-        <div className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
-          <h2 className="text-2xl">The 2026 PAYE bands</h2>
-          <div className="mt-4 overflow-x-auto rounded-2xl border border-line">
-            <table className="num w-full text-sm">
-              <thead className="bg-canvas text-left"><tr><th scope="col" className="p-3">Annual taxable income</th><th scope="col" className="p-3">Rate</th></tr></thead>
-              <tbody>
-                {[["First ₦800,000", "0%"], ["₦800,001 – ₦3,000,000", "15%"], ["₦3,000,001 – ₦12,000,000", "18%"], ["₦12,000,001 – ₦25,000,000", "21%"], ["₦25,000,001 – ₦50,000,000", "23%"], ["Above ₦50,000,000", "25%"]].map(([b, r]) => (
-                  <tr key={b} className="border-t border-line"><td className="p-3">{b}</td><td className="p-3 font-semibold">{r}</td></tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="mt-4 text-ink-soft">For the full method with worked examples, read <Link href="/insights/how-to-calculate-paye-in-nigeria" className="font-semibold text-brand underline">how to calculate PAYE in Nigeria</Link>.</p>
-
-          <h2 className="mt-12 text-2xl">Questions</h2>
-          <div className="mt-4 divide-y divide-line rounded-2xl border border-line">
-            {faqs.map((f) => (
-              <details key={f.q} className="group p-5 [&_summary::-webkit-details-marker]:hidden">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold">{f.q}<span aria-hidden className="text-xl text-muted group-open:rotate-45">+</span></summary>
-                <p className="mt-2 text-ink-soft">{f.a}</p>
-              </details>
-            ))}
-          </div>
-
-          <div className="mt-12 rounded-3xl bg-ink p-6 text-white sm:p-8">
-            <p className="text-xl font-bold">Running payroll for a team?</p>
-            <p className="mt-1 text-white/80">BizBooks calculates PAYE, pension and NHF for everyone, creates payslips and a bank upload file, and reminds you to remit.</p>
-            <ButtonLink href="/solutions/payroll" variant="light" className="mt-5">See payroll</ButtonLink>
-          </div>
-        </div>
-      </section>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
-        "@context": "https://schema.org",
-        "@graph": [
-          { "@type": "WebApplication", name: "PAYE calculator Nigeria 2026", applicationCategory: "FinanceApplication", operatingSystem: "Web", offers: { "@type": "Offer", price: "0", priceCurrency: "NGN" } },
-          { "@type": "FAQPage", mainEntity: faqs.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) },
-        ],
-      }) }} />
-    </>
-  );
+export default function Page() {
+  return <ToolPage c={c}><PayeCalculator /></ToolPage>;
 }

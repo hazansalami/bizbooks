@@ -42,9 +42,13 @@
 - [Wave in Nigeria: your options](/insights/wave-invoicing-nigeria-options)
 - [Finance and tax glossary](/insights/business-finance-glossary-nigeria)
 
-## Free tools
-- [PAYE calculator 2026](/tools/paye-calculator)
-- [VAT & WHT invoice calculator](/tools/vat-wht-calculator)
+## Free calculators (/tools)
+- [PAYE calculator 2026](/tools/paye-calculator): salary to PAYE, pension, take-home
+- [Net to gross salary calculator](/tools/net-to-gross-salary-calculator): gross pay needed for a target take-home
+- [Cost of an employee calculator](/tools/employer-cost-calculator): salary + 10% pension + NSITF + ITF
+- [Company income tax calculator 2026](/tools/company-income-tax-calculator): small company check, 30% CIT, 4% development levy
+- [VAT calculator (7.5%)](/tools/vat-calculator): add or remove VAT
+- [VAT & WHT invoice calculator](/tools/vat-wht-calculator): what a client actually pays
 
 ## Pages
 - [Home](/)

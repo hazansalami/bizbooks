@@ -49,6 +49,7 @@ export function AdvisorForm({ defaults, source = "WEBSITE" }: { defaults?: Parti
         <Textarea name="message" defaultValue={v.message} />
       </Field>
       <SubmitButton size="lg" pending={pending} pendingText="Sending…">Book a free consultation</SubmitButton>
+      <p className="text-xs text-muted">By sending this you agree to our <a href="/privacy" className="underline">Privacy Policy</a>. A consultation is general information until an engagement letter is signed (see our <a href="/terms" className="underline">Terms</a>).</p>
     </form>
   );
 }

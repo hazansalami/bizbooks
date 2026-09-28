@@ -39,6 +39,17 @@ export function SignupForm() {
       <Field label="Create a password" name="password" hint="At least 8 characters." error={e.password} required>
         <PasswordInput name="password" autoComplete="new-password" error={e.password} />
       </Field>
+      <div>
+        <label className="flex items-start gap-3 text-sm">
+          <input type="checkbox" name="terms" required aria-invalid={e.terms ? true : undefined} aria-describedby={e.terms ? "terms-error" : undefined} className="mt-0.5 size-5 shrink-0 accent-brand" />
+          <span>
+            I agree to the <Link href="/terms" target="_blank" className="font-semibold text-brand underline">Terms of Service</Link> and{" "}
+            <Link href="/privacy" target="_blank" className="font-semibold text-brand underline">Privacy Policy</Link>, and understand that BizBooks provides
+            software and general information, not tax, legal or accounting advice.
+          </span>
+        </label>
+        {e.terms && <p id="terms-error" role="alert" className="mt-2 text-sm font-medium text-danger">{e.terms}</p>}
+      </div>
       <SubmitButton size="lg" className="w-full" pending={pending} pendingText="Creating your account…">Create my free account</SubmitButton>
       <p className="text-center text-sm text-muted">
         Already have an account? <Link href="/login" className="font-semibold text-brand hover:underline">Log in</Link>

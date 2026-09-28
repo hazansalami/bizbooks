@@ -67,6 +67,8 @@ See our full [professional invoice checklist](/insights/how-to-write-a-professio
 
 The NRS is rolling out mandatory e-invoicing through its **Merchant-Buyer Solution (MBS)**, starting with large taxpayers. Published timelines put **medium taxpayers (₦1bn–₦5bn turnover)** live from July 2026 with enforcement from January 2027, and **smaller taxpayers** live from July 2027. Most SMEs have time, but invoices should already be clean, numbered and consistent.
 
+Need a quick figure? Use the free [VAT calculator](/tools/vat-calculator) to add or remove 7.5% VAT.
+
 ## How BizBooks handles VAT
 
 Add VAT to any invoice with one tap. BizBooks records output VAT when you **issue** the invoice, lets you log input VAT on expenses and bills, and shows **VAT for the month and the date it's due** on your [tax calendar](/solutions/taxes). The **VAT report** lists every invoice and expense for your return.

@@ -76,6 +76,8 @@ Give the supplier evidence so they can claim their credit.
 
 **Example:** You pay a freelance motion designer ₦300,000. Deduct 5% (₦15,000), pay them ₦285,000 and remit ₦15,000 to the relevant tax authority.
 
+Check any invoice with the free [VAT and WHT calculator](/tools/vat-wht-calculator).
+
 ## How BizBooks handles WHT
 
 - Choose **2%, 5% or 10% WHT** on any invoice. BizBooks shows the total, the WHT the client will deduct and the balance payable.

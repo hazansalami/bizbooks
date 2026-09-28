@@ -37,7 +37,7 @@ A small company still has to **file its annual returns**. A 0% rate isn't the sa
 
 The development levy is a single **4% charge on assessable profits** for companies that aren't small. It replaces four separate levies: Tertiary Education Tax, the IT levy, the NASENI levy and the Police Trust Fund levy. It's charged on profit *before* capital allowances and losses are deducted, so it can be higher than people expect.
 
-**Example:** A consultancy with ₦180m assessable profit pays ₦7.2m development levy (4% × ₦180m), on top of company income tax.
+**Example:** A consultancy with ₦180m assessable profit pays ₦7.2m development levy (4% × ₦180m), on top of company income tax. Estimate yours with the [company income tax calculator](/tools/company-income-tax-calculator).
 
 ## What changed about VAT?
 

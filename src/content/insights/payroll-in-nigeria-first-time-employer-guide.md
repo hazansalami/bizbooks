@@ -36,7 +36,7 @@ See [how to calculate PAYE](/insights/how-to-calculate-paye-in-nigeria) for work
 | **NSITF** | 1% of monthly payroll |
 | **ITF** | 1% of annual payroll (5+ staff or ₦50m+ turnover) |
 
-**Example:** An employee on ₦400,000 gross costs the company about **₦444,000 a month**: ₦400,000 pay + ₦40,000 employer pension + ₦4,000 NSITF, plus ITF over the year.
+**Example:** An employee on ₦400,000 gross costs a company with 5+ staff about **₦448,000 a month**: ₦400,000 pay + ₦40,000 employer pension + ₦4,000 NSITF + ₦4,000 ITF. Try the [cost of an employee calculator](/tools/employer-cost-calculator) or the [net to gross salary calculator](/tools/net-to-gross-salary-calculator).
 
 ## What's the monthly payroll routine?
 
