@@ -1,6 +1,7 @@
-// BizBooks data model (PostgreSQL: Supabase in production, `prisma dev` locally).
+// BizBooks data model (PostgreSQL: Prisma Postgres on Vercel in production, `prisma dev` locally).
 // Enum-like fields are stored as strings; allowed values live in src/lib/constants.ts.
-// Money is stored in naira as Float and rounded to 2 decimal places on every write (see lib/money.ts).
+// Money is a Float rounded to 2 decimal places on every write (see lib/money.ts). Invoice and payment
+// amounts are in the invoice's currency; exchangeRate (naira per unit) converts them for reports.
 
 generator client {
   provider = "prisma-client"

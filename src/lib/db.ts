@@ -5,8 +5,8 @@ import { PrismaPg } from "@prisma/adapter-pg";
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function createClient() {
-  // On Supabase use the pooled "transaction" connection string (port 6543) here;
-  // migrations use DIRECT_URL (see prisma.config.ts).
+  // Prisma Postgres: the direct postgres:// string (pooled by the service). The pg adapter can't use
+  // prisma+postgres:// Accelerate URLs. Migrations read the same URL unless DIRECT_URL is set.
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error("DATABASE_URL is not set");
   return new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
