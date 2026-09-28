@@ -5,7 +5,8 @@ import { cookies } from "next/headers";
 const COOKIE = "bb_session";
 const MAX_AGE_DAYS = 30;
 
-export type SessionPayload = { userId: string };
+/** issuedAt (ms) comes back from decrypt; it lets a password change sign out older sessions. */
+export type SessionPayload = { userId: string; issuedAt?: number };
 
 function key() {
   const secret = process.env.SESSION_SECRET;
@@ -14,7 +15,7 @@ function key() {
 }
 
 export async function encrypt(payload: SessionPayload) {
-  return new SignJWT(payload)
+  return new SignJWT({ userId: payload.userId })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE_DAYS}d`)
@@ -25,7 +26,7 @@ export async function decrypt(token: string | undefined): Promise<SessionPayload
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, key(), { algorithms: ["HS256"] });
-    return { userId: String(payload.userId) };
+    return { userId: String(payload.userId), issuedAt: typeof payload.iat === "number" ? payload.iat * 1000 : 0 };
   } catch {
     return null;
   }

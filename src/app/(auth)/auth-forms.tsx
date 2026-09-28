@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import { login, signup } from "@/app/actions/auth";
+import { login, requestPasswordReset, resetPassword, signup } from "@/app/actions/auth";
 import { SubmitButton, useFormAction, type FormState } from "@/components/form-bits";
 import { Field, Input, Notice } from "@/components/ui";
 
@@ -70,10 +70,52 @@ export function LoginForm({ next }: { next?: string }) {
       <Field label="Password" name="password" required>
         <PasswordInput name="password" autoComplete="current-password" />
       </Field>
+      <p className="-mt-2 text-right text-sm"><Link href="/forgot-password" className="font-semibold text-brand hover:underline">Forgot your password?</Link></p>
       <SubmitButton size="lg" className="w-full" pending={pending} pendingText="Logging in…">Log in</SubmitButton>
       <p className="text-center text-sm text-muted">
         New here? <Link href="/signup" className="font-semibold text-brand hover:underline">Create a free account</Link>
       </p>
+    </form>
+  );
+}
+
+export function ForgotPasswordForm() {
+  const { state, onSubmit, pending } = useFormAction<FormState>(requestPasswordReset, {});
+  if (state.ok) {
+    return (
+      <div className="space-y-4">
+        <Notice tone="brand">{state.message}</Notice>
+        <p className="text-center text-sm text-muted"><Link href="/login" className="font-semibold text-brand hover:underline">Back to log in</Link></p>
+      </div>
+    );
+  }
+  return (
+    <form onSubmit={onSubmit} className="space-y-5" noValidate>
+      <Field label="Email address" name="email" required error={state.errors?.email}>
+        <Input name="email" type="email" inputMode="email" autoComplete="email" defaultValue={state.values?.email} required error={state.errors?.email} />
+      </Field>
+      <SubmitButton size="lg" className="w-full" pending={pending} pendingText="Sending…">Email me a reset link</SubmitButton>
+      <p className="text-center text-sm text-muted">Remembered it? <Link href="/login" className="font-semibold text-brand hover:underline">Log in</Link></p>
+    </form>
+  );
+}
+
+export function ResetPasswordForm({ token }: { token: string }) {
+  const { state, onSubmit, pending } = useFormAction<FormState>(resetPassword, {});
+  const e = state.errors ?? {};
+  return (
+    <form onSubmit={onSubmit} className="space-y-5" noValidate>
+      {state.message && (
+        <Notice tone="danger">{state.message} <Link href="/forgot-password" className="font-semibold underline">Get a new link</Link></Notice>
+      )}
+      <input type="hidden" name="token" value={token} />
+      <Field label="New password" name="password" hint="At least 8 characters." error={e.password} required>
+        <PasswordInput name="password" autoComplete="new-password" error={e.password} />
+      </Field>
+      <Field label="Type it again" name="confirm" error={e.confirm} required>
+        <PasswordInput name="confirm" autoComplete="new-password" error={e.confirm} />
+      </Field>
+      <SubmitButton size="lg" className="w-full" pending={pending} pendingText="Saving…">Save new password and log in</SubmitButton>
     </form>
   );
 }

@@ -7,7 +7,10 @@ import { readSession } from "./session";
 export const getCurrentUser = cache(async () => {
   const session = await readSession();
   if (!session) return null;
-  return db.user.findUnique({ where: { id: session.userId }, include: { business: true } });
+  const user = await db.user.findUnique({ where: { id: session.userId }, include: { business: true } });
+  // A session from before the latest password change is no longer valid (JWT iat has 1-second precision).
+  if (user?.passwordChangedAt && (session.issuedAt ?? 0) < Math.floor(user.passwordChangedAt.getTime() / 1000) * 1000) return null;
+  return user;
 });
 
 export async function requireUser() {
