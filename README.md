@@ -32,7 +32,7 @@ platform's own Paystack account.
 ## Stack
 
 Same as the ECDI portal: Next.js 16 (App Router, server actions) · React 19 · Prisma 7 + PostgreSQL
-(Supabase in production, `prisma dev` locally) · Tailwind CSS 4 · jose sessions · Resend for email ·
+(Prisma Postgres on Vercel in production, `prisma dev` locally) · Tailwind CSS 4 · jose sessions · Resend for email ·
 Vercel (hosting + daily cron).
 
 ## Run it locally
@@ -56,16 +56,22 @@ npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prism
 npx prisma migrate deploy
 ```
 
-Against Supabase, plain `npx prisma migrate dev` works.
+Against a real Prisma Postgres database (not `prisma dev`), plain `npx prisma migrate dev` works; use a separate development database for that, never production.
 
-## Deploy (Vercel + Supabase)
+## Deploy (Vercel + Prisma Postgres)
 
-1. Create a Supabase project. Put the **transaction pooler** URL (port 6543) in `DATABASE_URL` and the **session/direct** URL (5432) in `DIRECT_URL`.
-2. Import the repo into Vercel and set every variable from `.env.example`. `ENCRYPTION_KEY` must never change after launch.
-3. Run `npx prisma migrate deploy` against production once.
-4. `vercel.json` schedules `/api/cron/daily` at 06:00 UTC (07:00 Lagos). Set `CRON_SECRET` in Vercel.
-5. Verify a sending domain in Resend and set `EMAIL_FROM`.
-6. For Pro billing, add `PLATFORM_PAYSTACK_SECRET_KEY` and set the Paystack webhook to `https://<domain>/api/webhooks/platform`.
+1. Import the repo into Vercel. In the project, open **Storage → Create Database → Prisma Postgres** and pick the region closest to your functions (Frankfurt for Nigeria), then connect it to the project.
+2. Open the database's **Connect** tab and copy the **direct `postgres://` connection string**. Set it as `DATABASE_URL` in the project's Environment Variables (replace the `prisma+postgres://` value Vercel may add by default; the pg adapter can't use it). Leave `DIRECT_URL` unset.
+3. In **Settings → Functions**, set the function region to match the database region.
+4. Set every other variable from `.env.example`. `ENCRYPTION_KEY` must never change after launch.
+5. Create the tables once from your machine, pointing Prisma at production for that one command (a variable set in the shell wins over `.env`, and nothing is saved):
+   - PowerShell: `$env:DATABASE_URL="postgres://…"; npx prisma migrate deploy; Remove-Item Env:DATABASE_URL`
+   - Bash: `DATABASE_URL="postgres://…" npx prisma migrate deploy`
+
+   Run it again after any release that adds a migration.
+6. `vercel.json` schedules `/api/cron/daily` at 06:00 UTC (07:00 Lagos). Set `CRON_SECRET` in Vercel.
+7. Verify a sending domain in Resend and set `EMAIL_FROM`.
+8. For Pro billing, add `PLATFORM_PAYSTACK_SECRET_KEY` and set the Paystack webhook to `https://<domain>/api/webhooks/platform`.
 
 ## How payments flow
 

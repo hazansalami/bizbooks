@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
     take: 300,
   });
   for (const b of quiet) {
-    const owed = b.invoices.reduce((s, i) => s + balanceDue(i), 0);
+    const owed = b.invoices.reduce((s, i) => s + balanceDue(i) * i.exchangeRate, 0);
     const late = b.invoices.filter((i) => i.dueDate < now).length;
     const sentAny = await db.invoice.count({ where: { businessId: b.id, sentAt: { not: null } } });
     const first = b.owner.fullName.split(" ")[0];

@@ -5,7 +5,7 @@ import { inSequence, planLabel, risksFor } from "@/lib/admin";
 import { addNote, clearCancel, endPause, grantPro, revokePro } from "@/app/actions/admin";
 import { Badge } from "@/components/ui";
 import { isPro } from "@/lib/plan";
-import { naira, nairaShort } from "@/lib/money";
+import { money, naira, nairaShort } from "@/lib/money";
 import { formatDate, timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -29,8 +29,8 @@ export default async function AdminBusiness({ params }: { params: Promise<{ id: 
     () => db.expense.count({ where: { businessId: id } }),
     () => db.payRun.count({ where: { businessId: id, status: "PAID" } }),
     () => db.invoice.count({ where: { businessId: id, sentAt: { not: null }, importSource: null } }),
-    () => db.invoice.aggregate({ where: { businessId: id, kind: "INVOICE", status: { not: "VOID" } }, _count: { _all: true }, _sum: { total: true } }),
-    () => db.payment.aggregate({ where: { businessId: id }, _count: { _all: true }, _sum: { amount: true } }),
+    () => db.invoice.findMany({ where: { businessId: id, kind: "INVOICE", status: { not: "VOID" } }, select: { total: true, exchangeRate: true } }),
+    () => db.payment.findMany({ where: { businessId: id }, select: { amount: true, exchangeRate: true } }),
     () => db.invoice.findMany({ where: { businessId: id }, orderBy: { createdAt: "desc" }, take: 8, include: { customer: { select: { name: true } } } }),
     () => db.platformPayment.findMany({ where: { businessId: id }, orderBy: { createdAt: "desc" }, take: 10 }),
     () => db.cancellationFeedback.findMany({ where: { businessId: id }, orderBy: { createdAt: "desc" } }),
@@ -63,8 +63,8 @@ export default async function AdminBusiness({ params }: { params: Promise<{ id: 
       )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Fact label="Invoices" value={String(invoiced._count._all)} hint={`${nairaShort(invoiced._sum.total ?? 0)} · ${sent} sent from BizBooks`} />
-        <Fact label="Payments recorded" value={String(paid._count._all)} hint={nairaShort(paid._sum.amount ?? 0)} />
+        <Fact label="Invoices" value={String(invoiced.length)} hint={`${nairaShort(invoiced.reduce((s, i) => s + i.total * i.exchangeRate, 0))} · ${sent} sent from BizBooks`} />
+        <Fact label="Payments recorded" value={String(paid.length)} hint={nairaShort(paid.reduce((s, p) => s + p.amount * p.exchangeRate, 0))} />
         <Fact label="Clients" value={String(customers)} hint={`${schedules} active recurring invoices`} />
         <Fact label="Payroll" value={String(employees)} hint={`${payRuns} runs paid · ${expenses} expenses`} />
         <Fact label="Getting paid" value={b.gateways.filter((g) => g.enabled).map((g) => g.provider[0] + g.provider.slice(1).toLowerCase()).join(", ") || "Bank only"} hint={`${b.bankAccounts.length} bank account${b.bankAccounts.length === 1 ? "" : "s"}`} />
@@ -112,7 +112,7 @@ export default async function AdminBusiness({ params }: { params: Promise<{ id: 
               {recent.map((i) => (
                 <li key={i.id} className="flex justify-between gap-3 py-2">
                   <span>{i.kind === "QUOTE" ? "Quote" : "Invoice"} {i.number} · {i.customer.name}{i.importSource ? <span className="text-muted"> · imported</span> : null}</span>
-                  <span className="num whitespace-nowrap">{naira(i.total)} <span className="text-muted">· {i.status.toLowerCase()}</span></span>
+                  <span className="num whitespace-nowrap">{money(i.total, i.currency)} <span className="text-muted">· {i.status.toLowerCase()}</span></span>
                 </li>
               ))}
             </ul>

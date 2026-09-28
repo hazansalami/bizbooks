@@ -6,7 +6,7 @@ import { receivables } from "@/lib/stats";
 import { accrualSeries, accrualTotals, cashFlowSeries, monthStart, payables, type Aging } from "@/lib/finance";
 import { taxObligations } from "@/lib/taxes";
 import { computePay, payDateFor, periodOf } from "@/lib/payroll";
-import { naira, nairaShort } from "@/lib/money";
+import { money, naira, nairaShort } from "@/lib/money";
 import { inGracePeriod, isPro } from "@/lib/plan";
 import { addDays, addMonths, cn, formatDate, timeAgo } from "@/lib/utils";
 import { ButtonLink, Panel } from "@/components/ui";
@@ -90,7 +90,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
 
   // Next 30 days: money expected in and going out, including payroll and tax deadlines.
   const upcoming: Upcoming[] = [];
-  for (const r of owed.rows) if (r.inv.dueDate <= horizon && r.late <= 0) upcoming.push({ date: r.inv.dueDate, label: r.inv.customer.name, sub: r.inv.number, amount: r.due, direction: "in", href: `/app/invoices/${r.inv.id}` });
+  for (const r of owed.rows) if (r.inv.dueDate <= horizon && r.late <= 0) upcoming.push({ date: r.inv.dueDate, label: r.inv.customer.name, sub: r.inv.number, amount: r.dueNgn, direction: "in", href: `/app/invoices/${r.inv.id}` });
   for (const b of bills.rows) if (b.due <= horizon && b.late <= 0) upcoming.push({ date: b.due, label: b.bill.vendor || b.bill.category, sub: "Bill", amount: b.bill.amount, direction: "out", href: `/app/expenses/${b.bill.id}` });
   if (team.length) {
     const period = runs.some((r) => r.period === periodOf(now) && r.status === "PAID") ? periodOf(addMonths(now, 1)) : periodOf(now);
@@ -107,7 +107,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
   const expectedIn = upcoming.filter((u) => u.direction === "in").reduce((s, u) => s + u.amount, 0);
   const goingOut = upcoming.filter((u) => u.direction === "out").reduce((s, u) => s + u.amount, 0);
 
-  const overdueInvoices = owed.rows.filter((r) => r.late > 0).sort((a, b) => b.due - a.due);
+  const overdueInvoices = owed.rows.filter((r) => r.late > 0).sort((a, b) => b.dueNgn - a.dueNgn);
   const overdueBills = bills.rows.filter((r) => r.late > 0);
 
   const checklist = [
@@ -151,7 +151,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
           <ul className="mt-3 divide-y divide-line">
             {claims.map((c) => (
               <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
-                <span><strong>{c.invoice.customer.name}</strong> · <span className="num">{naira(c.amount)}</span> for {c.invoice.number} · <span className="text-muted">{timeAgo(c.createdAt)}</span></span>
+                <span><strong>{c.invoice.customer.name}</strong> · <span className="num">{money(c.amount, c.invoice.currency)}</span> for {c.invoice.number} · <span className="text-muted">{timeAgo(c.createdAt)}</span></span>
                 <ButtonLink href={`/app/invoices/${c.invoiceId}`} size="sm" variant="secondary">Review</ButtonLink>
               </li>
             ))}
@@ -198,7 +198,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
                 <li key={inv.id}>
                   <Link href={`/app/invoices/${inv.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-canvas">
                     <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{inv.customer.name}</span><span className="text-sm text-danger">Overdue {late} day{late === 1 ? "" : "s"} · {inv.number}</span></span>
-                    <span className="num font-bold">{naira(due)}</span>
+                    <span className="num font-bold">{money(due, inv.currency)}</span>
                     <ChevronRight className="size-4 text-muted" aria-hidden />
                   </Link>
                 </li>

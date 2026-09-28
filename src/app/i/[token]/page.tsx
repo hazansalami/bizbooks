@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { canPayOnline, loadFullInvoice } from "@/lib/invoices";
 import { pickGateway } from "@/lib/checkout";
 import { getCurrentUser } from "@/lib/auth";
-import { balanceDue, computeTotals, naira } from "@/lib/money";
+import { balanceDue, computeTotals, money } from "@/lib/money";
 import { formatDate } from "@/lib/utils";
 import { Notice } from "@/components/ui";
 import { PrintButton } from "@/components/form-bits";
@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const label = inv.kind === "QUOTE" ? "Quote" : "Invoice";
   return {
     title: `${label} ${inv.number} from ${inv.business.name}`,
-    description: `${label} for ${naira(inv.kind === "QUOTE" ? inv.total : balanceDue(inv))}, ${inv.kind === "QUOTE" ? "valid until" : "due"} ${formatDate(inv.dueDate)}.`,
+    description: `${label} for ${money(inv.kind === "QUOTE" ? inv.total : balanceDue(inv), inv.currency)}, ${inv.kind === "QUOTE" ? "valid until" : "due"} ${formatDate(inv.dueDate)}.`,
     robots: { index: false, follow: false },
   };
 }

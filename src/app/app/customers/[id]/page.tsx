@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Mail, MessageCircle, Phone } from "lucide-react";
 import { requireBusiness } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { balanceDue, naira } from "@/lib/money";
+import { balanceDue, money, naira } from "@/lib/money";
 import { INVOICE_STATUS } from "@/lib/constants";
 import { formatDate, greetingName, whatsappLink } from "@/lib/utils";
 import { deleteCustomer } from "@/app/actions/customers";
@@ -33,8 +33,9 @@ export default async function CustomerPage({ params, searchParams }: { params: P
   }
 
   const invoices = c.invoices.filter((i) => i.kind === "INVOICE" && i.status !== "VOID");
-  const owes = invoices.filter((i) => ["SENT", "PARTIAL"].includes(i.status)).reduce((s, i) => s + balanceDue(i), 0);
-  const paid = invoices.reduce((s, i) => s + i.amountPaid, 0);
+  // Totals in naira, so a client billed in dollars adds up correctly.
+  const owes = invoices.filter((i) => ["SENT", "PARTIAL"].includes(i.status)).reduce((s, i) => s + balanceDue(i) * i.exchangeRate, 0);
+  const paid = invoices.reduce((s, i) => s + i.amountPaid * i.exchangeRate, 0);
 
   return (
     <>
@@ -72,7 +73,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
               <li key={inv.id}>
                 <Link href={`/app/invoices/${inv.id}`} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-canvas">
                   <div><p className="font-semibold">{inv.number}{inv.kind === "QUOTE" && <span className="font-normal text-muted"> · quote</span>}</p><p className="text-sm text-muted">{formatDate(inv.issueDate)}</p></div>
-                  <div className="text-right"><p className="num font-bold">{naira(inv.total)}</p><Badge tone={st.tone}>{st.label}</Badge></div>
+                  <div className="text-right"><p className="num font-bold">{money(inv.total, inv.currency)}</p><Badge tone={st.tone}>{st.label}</Badge></div>
                 </Link>
               </li>
             );

@@ -13,7 +13,7 @@ export default async function Customers({ searchParams }: { searchParams: Promis
   const { q = "" } = await searchParams;
   const customers = await db.customer.findMany({
     where: { businessId: business.id, ...(q ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { phone: { contains: q } }, { email: { contains: q, mode: "insensitive" } }] } : {}) },
-    include: { invoices: { where: { kind: "INVOICE", status: { in: ["SENT", "PARTIAL"] } }, select: { total: true, whtAmount: true, amountPaid: true } } },
+    include: { invoices: { where: { kind: "INVOICE", status: { in: ["SENT", "PARTIAL"] } }, select: { total: true, whtAmount: true, amountPaid: true, exchangeRate: true } } },
     orderBy: { name: "asc" },
   });
   const total = await db.customer.count({ where: { businessId: business.id } });
@@ -31,7 +31,7 @@ export default async function Customers({ searchParams }: { searchParams: Promis
           </form>
           <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-paper">
             {customers.map((c) => {
-              const owes = c.invoices.reduce((s, i) => s + balanceDue(i), 0);
+              const owes = c.invoices.reduce((s, i) => s + balanceDue(i) * i.exchangeRate, 0);
               return (
                 <li key={c.id}>
                   <Link href={`/app/customers/${c.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-canvas sm:px-5">

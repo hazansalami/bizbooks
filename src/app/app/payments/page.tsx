@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Wallet } from "lucide-react";
 import { requireBusiness } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { naira } from "@/lib/money";
+import { money, naira } from "@/lib/money";
 import { PAYMENT_METHODS } from "@/lib/constants";
 import { formatDate } from "@/lib/utils";
 import { Badge, EmptyState, PageHeader } from "@/components/ui";
@@ -32,7 +32,7 @@ export default async function Payments() {
                   <p className="text-sm text-muted">{formatDate(p.paidAt)}{p.invoice ? ` · ${p.invoice.number}` : ""}</p>
                 </div>
                 <div className="text-right">
-                  <p className="num font-bold text-brand-deep">+{naira(p.amount)}</p>
+                  <p className="num font-bold text-brand-deep">+{money(p.amount, p.invoice?.currency)}</p>{p.invoice && p.invoice.currency !== "NGN" && <p className="num text-xs text-muted">≈ {naira(p.amount * p.exchangeRate)}</p>}
                   <Badge tone={p.reference ? "brand" : "neutral"}>{PAYMENT_METHODS[p.method] ?? p.method}</Badge>
                 </div>
               </Link>

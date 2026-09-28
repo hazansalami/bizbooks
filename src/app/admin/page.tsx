@@ -33,10 +33,10 @@ export default async function AdminOverview() {
     () => db.platformPayment.aggregate({ where: { status: "PAID" }, _sum: { amount: true } }),
     () => db.platformPayment.aggregate({ where: { status: "PAID", paidAt: { gte: d30 } }, _sum: { amount: true }, _count: { _all: true } }),
     () => db.platformPayment.findMany({ where: { status: "PAID" }, orderBy: { paidAt: "desc" }, select: { businessId: true, amount: true, months: true } }),
-    () => db.invoice.aggregate({ where: { kind: "INVOICE", importSource: null, status: { not: "VOID" }, createdAt: { gte: d30 } }, _count: { _all: true }, _sum: { total: true } }),
-    () => db.invoice.aggregate({ where: { kind: "INVOICE", importSource: null, status: { not: "VOID" } }, _count: { _all: true }, _sum: { total: true } }),
+    () => db.invoice.findMany({ where: { kind: "INVOICE", importSource: null, status: { not: "VOID" }, createdAt: { gte: d30 } }, select: { total: true, exchangeRate: true } }),
+    () => db.invoice.count({ where: { kind: "INVOICE", importSource: null, status: { not: "VOID" } } }),
     () => db.invoice.count({ where: { kind: "QUOTE", createdAt: { gte: d30 } } }),
-    () => db.payment.groupBy({ by: ["method"], where: { paidAt: { gte: d30 }, invoice: { importSource: null } }, _count: { _all: true }, _sum: { amount: true } }),
+    () => db.payment.findMany({ where: { paidAt: { gte: d30 }, invoice: { importSource: null } }, select: { method: true, amount: true, exchangeRate: true } }),
     () => db.payRun.aggregate({ where: { status: "PAID", paidAt: { gte: d30 } }, _count: { _all: true }, _sum: { gross: true } }),
     () => db.employee.count(),
     () => db.lead.count(),
@@ -57,9 +57,11 @@ export default async function AdminOverview() {
   for (const p of proPayments) if (!lastPayment.has(p.businessId)) lastPayment.set(p.businessId, p);
   const mrr = activePro.reduce((s, b) => { const p = lastPayment.get(b.id); return s + (p ? p.amount / Math.max(1, p.months) : 0); }, 0);
   const comped = activePro.filter((b) => !lastPayment.has(b.id)).length;
+  // All money in naira: foreign-currency invoices and payments convert at their own rates.
   const online = payGroups.filter((g) => ONLINE.includes(g.method));
-  const sum = (gs: typeof payGroups) => gs.reduce((s, g) => s + (g._sum.amount ?? 0), 0);
-  const count = (gs: typeof payGroups) => gs.reduce((s, g) => s + g._count._all, 0);
+  const sum = (gs: typeof payGroups) => gs.reduce((s, g) => s + g.amount * g.exchangeRate, 0);
+  const count = (gs: typeof payGroups) => gs.length;
+  const invoiced30 = inv30.reduce((s, i) => s + i.total * i.exchangeRate, 0);
   const risky = rows.filter((r) => r.riskLevel >= 2).sort((a, b) => b.riskLevel - a.riskLevel || Number(b.pro) - Number(a.pro)).slice(0, 12);
 
   const weeks = Array.from({ length: 12 }, (_, i) => addDays(now, -7 * (11 - i)));
@@ -93,7 +95,7 @@ export default async function AdminOverview() {
       </Section>
 
       <Section title="Activity on the platform, last 30 days">
-        <Kpi label="Invoices created" value={inv30._count._all} hint={`${nairaShort(inv30._sum.total ?? 0)} invoiced · ${invAll._count._all} all time`} />
+        <Kpi label="Invoices created" value={inv30.length} hint={`${nairaShort(invoiced30)} invoiced · ${invAll} all time`} />
         <Kpi label="Payments recorded" value={count(payGroups)} hint={`${nairaShort(sum(payGroups))} received by businesses`} />
         <Kpi label="Paid online" value={count(online)} hint={`${nairaShort(sum(online))} via their Paystack/Flutterwave`} />
         <Kpi label="Payroll runs paid" value={payroll30._count._all} hint={`${nairaShort(payroll30._sum.gross ?? 0)} gross · ${employees} people on payroll`} />

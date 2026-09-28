@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { PERIODS, periodRange, previousRange, profitAndLoss, vatSummary, type Period } from "@/lib/reports";
 import { accrualTotals, agingOf, cashDate, paidExpensesWhere, payables, type Aging } from "@/lib/finance";
 import { receivables } from "@/lib/stats";
-import { naira, round2 } from "@/lib/money";
+import { naira, round2, money } from "@/lib/money";
 import { periodLabel } from "@/lib/payroll";
 import { PAYMENT_METHODS } from "@/lib/constants";
 import { cn, daysBetween, formatDate } from "@/lib/utils";
@@ -113,7 +113,7 @@ export default async function Report({ params, searchParams }: Props) {
     const byMonth = new Map<string, { inflow: number; outflow: number; payroll: number }>();
     const key = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const row = (k: string) => byMonth.get(k) ?? byMonth.set(k, { inflow: 0, outflow: 0, payroll: 0 }).get(k)!;
-    for (const p of payments) row(key(p.paidAt)).inflow += p.amount;
+    for (const p of payments) row(key(p.paidAt)).inflow += p.amount * p.exchangeRate;
     for (const e of expenses) { const r = row(key(cashDate(e))); if (e.payRunId) r.payroll += e.amount; else r.outflow += e.amount; }
     const months = [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b));
     const t = months.reduce((s, [, v]) => ({ inflow: s.inflow + v.inflow, outflow: s.outflow + v.outflow, payroll: s.payroll + v.payroll }), { inflow: 0, outflow: 0, payroll: 0 });
@@ -137,8 +137,8 @@ export default async function Report({ params, searchParams }: Props) {
         </div>
         <h2 className="text-lg">VAT on sales</h2>
         <Table head={["Date", "Invoice", "Client", "Client TIN", "Net amount", "VAT"]} align={["l", "l", "l", "l", "r", "r"]}
-          rows={v.invoices.map((i) => [formatDate(i.issueDate), i.number, i.customer.name, i.customer.tin ?? "—", naira(i.subtotal - i.discount), naira(i.vatAmount)])}
-          foot={["Total", "", "", "", naira(round2(v.invoices.reduce((s, i) => s + i.subtotal - i.discount, 0))), naira(v.output)]} />
+          rows={v.invoices.map((i) => [formatDate(i.issueDate), i.number, i.customer.name, i.customer.tin ?? "—", `${naira(i.netNgn)}${i.currency !== "NGN" ? ` (${i.currency})` : ""}`, naira(i.vatNgn)])}
+          foot={["Total", "", "", "", naira(round2(v.invoices.reduce((s, i) => s + i.netNgn, 0))), naira(v.output)]} />
         <h2 className="text-lg">VAT on purchases</h2>
         <Table head={["Date", "Supplier", "Category", "Amount", "VAT"]} align={["l", "l", "l", "r", "r"]}
           rows={v.expenses.map((e) => [formatDate(e.date), e.vendor ?? "—", e.category, naira(e.amount), naira(e.vatAmount)])}
@@ -156,9 +156,9 @@ export default async function Report({ params, searchParams }: Props) {
     const owed = await receivables(id);
     const m = new Map<string, { name: string; invoiced: number; paid: number; owed: number }>();
     const get = (cid: string, name: string) => m.get(cid) ?? m.set(cid, { name, invoiced: 0, paid: 0, owed: 0 }).get(cid)!;
-    for (const i of invoices) get(i.customerId, i.customer.name).invoiced += i.total;
-    for (const p of payments) if (p.invoice) get(p.invoice.customerId, p.invoice.customer.name).paid += p.amount;
-    for (const r of owed.rows) get(r.inv.customerId, r.inv.customer.name).owed += r.due;
+    for (const i of invoices) get(i.customerId, i.customer.name).invoiced += i.total * i.exchangeRate;
+    for (const p of payments) if (p.invoice) get(p.invoice.customerId, p.invoice.customer.name).paid += p.amount * p.exchangeRate;
+    for (const r of owed.rows) get(r.inv.customerId, r.inv.customer.name).owed += r.dueNgn;
     const rows = [...m.values()].sort((a, b) => b.invoiced - a.invoiced);
     const sum = (k: "invoiced" | "paid" | "owed") => naira(round2(rows.reduce((s, r) => s + r[k], 0)));
     body = (
@@ -172,7 +172,7 @@ export default async function Report({ params, searchParams }: Props) {
   if (slug === "aged-receivables") {
     const owed = await receivables(id);
     const byClient = new Map<string, { name: string; items: { amount: number; late: number }[] }>();
-    for (const r of owed.rows) (byClient.get(r.inv.customerId) ?? byClient.set(r.inv.customerId, { name: r.inv.customer.name, items: [] }).get(r.inv.customerId)!).items.push({ amount: r.due, late: r.late });
+    for (const r of owed.rows) (byClient.get(r.inv.customerId) ?? byClient.set(r.inv.customerId, { name: r.inv.customer.name, items: [] }).get(r.inv.customerId)!).items.push({ amount: r.dueNgn, late: r.late });
     const rows = [...byClient.values()].map((c) => ({ name: c.name, a: agingOf(c.items) })).sort((x, y) => y.a.total - x.a.total);
     body = <Table head={["Client", ...agingHead]} rows={rows.map((r) => [r.name, ...agingCells(r.a)])} foot={["Total", ...agingCells(owed.aging)]} />;
   }
@@ -185,8 +185,8 @@ export default async function Report({ params, searchParams }: Props) {
     body = (
       <>
         <Table head={["Client", "Quote", "Deposit invoice", "Paid"]} align={["l", "l", "l", "r"]}
-          rows={open.map((d) => [d.customer.name, quotes.find((q) => q.id === d.depositForId)?.number ?? "—", <Link key="d" href={`/app/invoices/${d.id}`} className="text-brand underline">{d.number}</Link>, naira(d.amountPaid)])}
-          foot={["Total held", "", "", naira(round2(open.reduce((s, d) => s + d.amountPaid, 0)))]} />
+          rows={open.map((d) => [d.customer.name, quotes.find((q) => q.id === d.depositForId)?.number ?? "—", <Link key="d" href={`/app/invoices/${d.id}`} className="text-brand underline">{d.number}</Link>, naira(d.amountPaid * d.exchangeRate)])}
+          foot={["Total held", "", "", naira(round2(open.reduce((s, d) => s + d.amountPaid * d.exchangeRate, 0)))]} />
         <p className="mt-3 text-sm text-muted">Deposits are credited automatically when you turn the quote into its final invoice.</p>
       </>
     );
@@ -247,7 +247,7 @@ export default async function Report({ params, searchParams }: Props) {
       db.expense.findMany({ where: paidExpensesWhere(id, from, to) }),
     ]);
     const tx = [
-      ...payments.map((p) => ({ date: p.paidAt, desc: p.invoice ? `${p.invoice.customer.name} · ${p.invoice.number}` : "Payment", method: PAYMENT_METHODS[p.method] ?? p.method, amount: p.amount })),
+      ...payments.map((p) => ({ date: p.paidAt, desc: p.invoice ? `${p.invoice.customer.name} · ${p.invoice.number}${p.invoice.currency !== "NGN" ? ` · ${money(p.amount, p.invoice.currency)} at ₦${p.exchangeRate.toLocaleString("en-NG")}` : ""}` : "Payment", method: PAYMENT_METHODS[p.method] ?? p.method, amount: round2(p.amount * p.exchangeRate) })),
       ...expenses.map((e) => ({ date: cashDate(e), desc: [e.vendor, e.category].filter(Boolean).join(" · "), method: e.payRunId ? "Payroll" : PAYMENT_METHODS[e.method] ?? e.method, amount: -e.amount })),
     ].sort((a, b) => a.date.getTime() - b.date.getTime());
     const totals = tx.reduce<number[]>((acc, t) => [...acc, (acc.at(-1) ?? 0) + t.amount], []);

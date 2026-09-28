@@ -3,7 +3,7 @@ import { FileText, Search } from "lucide-react";
 import type { Prisma } from "@/generated/prisma/client";
 import { requireBusiness } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { balanceDue, naira } from "@/lib/money";
+import { balanceDue, money } from "@/lib/money";
 import { INVOICE_STATUS } from "@/lib/constants";
 import { cn, daysBetween, formatDate } from "@/lib/utils";
 import { Badge, ButtonLink, EmptyState, PageHeader } from "@/components/ui";
@@ -81,7 +81,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
                         <p className="text-sm text-muted">{inv.number} · {open ? `due ${formatDate(inv.dueDate)}` : formatDate(inv.issueDate)}</p>
                       </div>
                       <div className="text-right">
-                        <p className="num font-bold">{naira(open ? balanceDue(inv) : inv.total)}</p>
+                        <p className="num font-bold">{money(open ? balanceDue(inv) : inv.total, inv.currency)}</p>
                         {late > 0 ? <Badge tone="danger">{late}d overdue</Badge> : <Badge tone={st.tone}>{st.label}</Badge>}
                       </div>
                     </Link>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CalendarClock } from "lucide-react";
 import { requireBusiness } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { computeTotals, naira, type LineInput } from "@/lib/money";
+import { computeTotals, money, type LineInput } from "@/lib/money";
 import { FREE_RECURRING_LIMIT, FREQUENCIES } from "@/lib/constants";
 import { isPro } from "@/lib/plan";
 import { formatDate } from "@/lib/utils";
@@ -42,7 +42,7 @@ export default async function Recurring() {
                     <p className="truncate text-sm text-muted">{s.customer.name} · {FREQUENCIES[s.frequency]}</p>
                   </div>
                   <div className="text-right">
-                    <p className="num font-bold">{naira(t.total)}</p>
+                    <p className="num font-bold">{money(t.total, s.currency)}</p>
                     {s.status === "ACTIVE" ? <p className="text-xs text-muted">Next: {formatDate(s.nextRunAt)}</p> : <Badge tone={s.status === "PAUSED" ? "sun" : "neutral"}>{s.status === "PAUSED" ? "Paused" : "Ended"}</Badge>}
                   </div>
                 </Link>

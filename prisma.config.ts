@@ -8,7 +8,7 @@ export default defineConfig({
     seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    // Migrations need a direct (non-pooled) connection. On Supabase that's the "session" string (port 5432).
+    // Migrations use DIRECT_URL when set, otherwise the same Prisma Postgres string as the app.
     url: process.env["DIRECT_URL"] || process.env["DATABASE_URL"],
   },
 });

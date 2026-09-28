@@ -8,6 +8,7 @@ import { advance, runSchedule } from "@/lib/recurring";
 import { isPro } from "@/lib/plan";
 import { FREE_RECURRING_LIMIT, FREQUENCIES } from "@/lib/constants";
 import { parseAmount, round2 } from "@/lib/money";
+import { isCurrency } from "@/lib/currency";
 import { dateOrNull, startOfDay, str } from "@/lib/utils";
 import type { FormState } from "@/components/form-bits";
 
@@ -46,6 +47,9 @@ export async function saveSchedule(_: FormState, form: FormData): Promise<FormSt
       .filter((l) => l.description);
   } catch {}
   if (!items.length || items.some((l) => !(l.quantity > 0) || !(l.unitPrice >= 0))) errors.items = "Add at least one item with a quantity and price.";
+  const currency = isCurrency(str(form, "currency")) ? str(form, "currency") : "NGN";
+  const exchangeRate = currency === "NGN" ? 1 : parseAmount(str(form, "exchangeRate"));
+  if (currency !== "NGN" && !(exchangeRate > 0)) errors.exchangeRate = `Enter how many naira 1 ${currency} is worth.`;
   if (Object.keys(errors).length) return { errors, values };
 
   const data = {
@@ -55,6 +59,7 @@ export async function saveSchedule(_: FormState, form: FormData): Promise<FormSt
     vatRate: str(form, "applyVat") === "on" ? business.vatRate : 0,
     whtRate: [0, 2, 5, 10].includes(Number(str(form, "whtRate"))) ? Number(str(form, "whtRate")) : 0,
     notes: str(form, "notes") || null,
+    currency, exchangeRate,
   };
   let scheduleId = id;
   if (id) {
