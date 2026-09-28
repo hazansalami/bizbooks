@@ -1,17 +1,32 @@
 "use client";
 
-import { useState } from "react";
-import { Mail, MessageCircle, Wallet } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Mail, MessageCircle, Send, Wallet, X } from "lucide-react";
 import { emailInvoiceAction, markSharedAction, recordPayment } from "@/app/actions/invoices";
 import { CopyButton, SubmitButton, useFormAction, type FormState } from "./form-bits";
-import { buttonClass, Field, Input, Notice, Select } from "./ui";
+import { buttonClass, Field, Input, Notice, Select, Textarea } from "./ui";
 import { PAYMENT_METHODS } from "@/lib/constants";
 import { dateInput } from "@/lib/utils";
 
-export function SharePanel({ id, whatsappHref, link, hasEmail, customerName, kind, highlight }: {
+export function SharePanel({ id, whatsappHref, link, hasEmail, customerName, kind, highlight, email }: {
   id: string; whatsappHref: string; link: string; hasEmail: boolean; customerName: string; kind: "send" | "reminder"; highlight?: boolean;
+  /** Prefilled Email dialog: recipient, subject and message, all editable before sending. */
+  email: { to: string; subject: string; message: string; copyTo: string };
 }) {
   const { state, onSubmit, pending } = useFormAction<FormState>(emailInvoiceAction, {});
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [sent, setSent] = useState<string | null>(null);
+  const e = state.errors ?? {};
+  const v = state.values ?? {};
+
+  useEffect(() => {
+    if (state.ok) {
+      dialog.current?.close();
+      const t = setTimeout(() => setSent(state.message ?? "Sent."), 0);
+      return () => clearTimeout(t);
+    }
+  }, [state]);
+
   const mark = (channel: string) => {
     const f = new FormData();
     f.set("id", id);
@@ -26,17 +41,49 @@ export function SharePanel({ id, whatsappHref, link, hasEmail, customerName, kin
         <a href={whatsappHref} target="_blank" rel="noreferrer" onClick={() => mark("WhatsApp")} className={buttonClass("primary", "lg", "bg-[#1FAF5A] hover:bg-[#178F49]")}>
           <MessageCircle className="size-5" aria-hidden /> WhatsApp
         </a>
-        <form onSubmit={onSubmit}>
-          <input type="hidden" name="id" value={id} />
-          <input type="hidden" name="kind" value={kind} />
-          <SubmitButton variant="secondary" size="lg" className="w-full" pending={pending} pendingText="Sending…">
-            <Mail className="size-5" aria-hidden /> Email
-          </SubmitButton>
-        </form>
+        <button type="button" onClick={() => { setSent(null); dialog.current?.showModal(); }} className={buttonClass("secondary", "lg", "w-full")}>
+          <Mail className="size-5" aria-hidden /> Email
+        </button>
         <span onClick={() => mark("link")}><CopyButton text={link} label="Copy link" className="min-h-13 w-full text-base" /></span>
       </div>
-      {!hasEmail && !state.message && <p className="mt-2 text-sm text-muted">{customerName} has no email saved, so WhatsApp or the link is the way to go.</p>}
-      {state.message && <Notice tone={state.ok ? "brand" : "danger"} className="mt-3">{state.message}</Notice>}
+      {!hasEmail && !sent && <p className="mt-2 text-sm text-muted">{customerName} has no email saved yet. Tap Email to type one in; we&apos;ll remember it.</p>}
+      {sent && <Notice tone="brand" className="mt-3">{sent}</Notice>}
+
+      <dialog ref={dialog} aria-labelledby={`email-title-${id}`}
+        className="m-auto w-[min(40rem,calc(100vw-1.5rem))] rounded-2xl border border-line bg-paper p-0 text-ink shadow-2xl backdrop:bg-ink/40 backdrop:backdrop-blur-[2px]">
+        <form onSubmit={onSubmit} className="flex max-h-[85dvh] flex-col" noValidate>
+          <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
+            <h2 id={`email-title-${id}`} className="text-lg">{kind === "reminder" ? "Email a reminder" : "Email this invoice"}</h2>
+            <button type="button" onClick={() => dialog.current?.close()} aria-label="Close" className="grid size-9 place-items-center rounded-full text-muted hover:bg-canvas hover:text-ink"><X className="size-5" aria-hidden /></button>
+          </div>
+          <div className="space-y-4 overflow-y-auto px-5 py-4">
+            <input type="hidden" name="id" value={id} />
+            <input type="hidden" name="kind" value={kind} />
+            {state.message && !state.ok && <Notice tone="danger">{state.message}</Notice>}
+            <Field label="To" name="to" required error={e.to} hint="Separate several addresses with commas.">
+              <Input name="to" type="text" inputMode="email" autoComplete="email" defaultValue={v.to ?? email.to} placeholder="accounts@client.com" error={e.to} />
+            </Field>
+            <Field label="Subject" name="subject" required error={e.subject}>
+              <Input name="subject" defaultValue={v.subject ?? email.subject} maxLength={200} error={e.subject} />
+            </Field>
+            <Field label="Message" name="message" required error={e.message}>
+              <Textarea name="message" rows={8} defaultValue={v.message ?? email.message} maxLength={5000} error={e.message} className="min-h-44" />
+            </Field>
+            <p className="rounded-xl bg-canvas p-3 text-sm text-muted">
+              Below your message we add the {kind === "reminder" || !link.includes("/pay/") ? "" : "“Pay now” button, "}invoice link and your bank details, so your client can pay straight away.
+            </p>
+            {email.copyTo && (
+              <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+                <input type="checkbox" name="copyMe" defaultChecked className="size-5 accent-brand" /> Send me a copy at {email.copyTo}
+              </label>
+            )}
+          </div>
+          <div className="flex flex-col-reverse gap-2 border-t border-line px-5 py-4 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => dialog.current?.close()} className={buttonClass("ghost")}>Cancel</button>
+            <SubmitButton pending={pending} pendingText="Sending…"><Send className="size-4" aria-hidden /> Send email</SubmitButton>
+          </div>
+        </form>
+      </dialog>
     </section>
   );
 }

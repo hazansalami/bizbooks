@@ -1,3 +1,4 @@
+import { InstallLink, InstallNudge } from "@/components/pwa";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LogOut } from "lucide-react";
@@ -33,6 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
           <div className="mt-3 flex items-center justify-between">
             <Link href="/app/settings/billing"><Badge tone={pro ? "brand" : "neutral"}>{pro ? "Pro" : "Free plan"}</Badge></Link>
+            <InstallLink />
             {adminEmails().includes(user.email.toLowerCase()) && <Link href="/admin" className="text-xs font-semibold text-brand hover:underline">Admin</Link>}
             <form action={logout}>
               <button className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-muted hover:text-ink">
@@ -54,6 +56,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <main className="mx-auto max-w-5xl px-4 pb-28 pt-6 sm:px-6 lg:pb-12 lg:pt-10">{children}</main>
       </div>
       <BottomNav />
+      <InstallNudge variant="app" />
     </div>
   );
 }

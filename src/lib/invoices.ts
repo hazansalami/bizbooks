@@ -176,30 +176,51 @@ export function whatsappMessage(inv: FullInvoice, kind: "send" | "reminder" = "s
   return lines.join("\n");
 }
 
-export async function emailInvoice(inv: FullInvoice, kind: "send" | "reminder" = "send") {
-  if (!inv.customer.email) return { ok: false, error: `${inv.customer.name} has no email address. Add one, or share on WhatsApp instead.` };
+function emailHeading(inv: FullInvoice, kind: "send" | "reminder") {
+  if (inv.kind === "QUOTE") return `Quote ${inv.number} from ${inv.business.name}`;
+  if (kind === "send") return `Invoice ${inv.number} from ${inv.business.name}`;
+  return inv.dueDate < new Date() ? `Invoice ${inv.number} is overdue` : `Reminder: invoice ${inv.number} is due ${formatDate(inv.dueDate)}`;
+}
+
+/**
+ * The editable part of an invoice email, as plain text: what the owner sees (and can change) in the
+ * Email dialog. The pay button, bank details and invoice link are always added below it.
+ */
+export function emailDraft(inv: FullInvoice, kind: "send" | "reminder" = "send") {
+  const due = balanceDue(inv);
+  const lines = [
+    `Hello ${greetingName(inv.customer.name)},`,
+    inv.kind === "QUOTE"
+      ? `${inv.business.name} has sent you a quote for ${money(inv.total, inv.currency)}.`
+      : `${kind === "reminder" ? "Just a reminder: " : ""}${inv.business.name} has sent you an invoice for ${money(due, inv.currency)}, due on ${formatDate(inv.dueDate)}.`,
+    `Thank you,\n${inv.business.name}`,
+  ];
+  return { subject: emailHeading(inv, kind), message: lines.join("\n\n") };
+}
+
+/** Plain text from the dialog → safe HTML paragraphs (blank line = new paragraph, newline = line break). */
+function messageToParagraphs(message: string) {
+  return message.replace(/\r\n/g, "\n").split(/\n{2,}/).map((p) => p.trim()).filter(Boolean).map((p) => esc(p).replace(/\n/g, "<br>"));
+}
+
+export type EmailOverride = { to?: string[]; cc?: string[]; subject?: string; message?: string };
+
+export async function emailInvoice(inv: FullInvoice, kind: "send" | "reminder" = "send", o: EmailOverride = {}) {
+  const to = o.to?.length ? o.to : inv.customer.email ? [inv.customer.email] : [];
+  if (!to.length) return { ok: false, error: `${inv.customer.name} has no email address. Add one, or share on WhatsApp instead.` };
   const due = balanceDue(inv);
   const online = canPayOnline(inv);
   const isQuote = inv.kind === "QUOTE";
-  const overdue = inv.dueDate < new Date();
-  const heading = isQuote
-    ? `Quote ${inv.number} from ${inv.business.name}`
-    : kind === "reminder"
-      ? overdue ? `Invoice ${inv.number} is overdue` : `Reminder: invoice ${inv.number} is due ${formatDate(inv.dueDate)}`
-      : `Invoice ${inv.number} from ${inv.business.name}`;
-  const paragraphs = [
-    `Hello ${esc(greetingName(inv.customer.name))},`,
-    isQuote
-      ? `${esc(inv.business.name)} has sent you a quote for <strong>${money(inv.total, inv.currency)}</strong>.`
-      : `${kind === "reminder" ? "Just a reminder: " : ""}${esc(inv.business.name)} has sent you an invoice for <strong>${money(due, inv.currency)}</strong>, due on <strong>${formatDate(inv.dueDate)}</strong>.`,
-  ];
+  const draft = emailDraft(inv, kind);
+  const subject = o.subject?.trim() || draft.subject;
+  const paragraphs = messageToParagraphs(o.message?.trim() || draft.message);
   const banks = bankLines(inv);
   const after = !isQuote && banks.length
     ? [`${online ? "Prefer a bank transfer? " : "Pay by bank transfer to:"}<br>${banks.join("<br>")}<br>Use <strong>${inv.number}</strong> as the narration.`]
     : [];
   after.push(`<a href="${publicInvoiceUrl(inv.publicToken)}">View the full ${isQuote ? "quote" : "invoice"}</a>`);
   const { html, text } = layout({
-    heading,
+    heading: subject,
     paragraphs,
     button: isQuote ? { label: "View quote", href: publicInvoiceUrl(inv.publicToken) }
       : online ? { label: `Pay ${money(due, inv.currency)} now`, href: payUrl(inv.publicToken) }
@@ -208,20 +229,21 @@ export async function emailInvoice(inv: FullInvoice, kind: "send" | "reminder" =
     color: isPro(inv.business) ? inv.business.brandColor : undefined,
     footer: isPro(inv.business) ? inv.business.name : `Sent by ${esc(inv.business.name)} with ${APP_NAME}`,
   });
-  const r = await sendEmail({ to: inv.customer.email, subject: heading, html, text, replyTo: inv.business.email, fromName: inv.business.name });
+  const r = await sendEmail({ to, cc: o.cc, subject, html, text, replyTo: inv.business.email, fromName: inv.business.name });
   if (!r.ok) return r;
   const now = new Date();
+  const note = `Emailed ${to.join(", ")}`;
   await db.invoice.update({
     where: { id: inv.id },
     data: kind === "reminder"
-      ? { lastReminderAt: now, reminderCount: { increment: 1 }, events: { create: { type: "REMINDER", note: `Emailed ${inv.customer.email}` } } }
+      ? { lastReminderAt: now, reminderCount: { increment: 1 }, events: { create: { type: "REMINDER", note } } }
       : {
           sentAt: inv.sentAt ?? now,
           status: inv.status === "DRAFT" ? "SENT" : inv.status,
-          events: { create: { type: "SENT", note: `Emailed ${inv.customer.email}` } },
+          events: { create: { type: "SENT", note } },
         },
   });
-  return { ok: true };
+  return { ok: true, to, error: undefined as string | undefined };
 }
 
 export async function markSent(invoiceId: string, note: string) {

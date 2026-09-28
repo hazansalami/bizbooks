@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { BadgeCent, FileSignature, FileText, Home, LayoutGrid, Plus, Receipt, Users, UsersRound, X } from "lucide-react";
+import { BadgeCent, ChevronDown, FileSignature, FileText, Home, LayoutGrid, Plus, Receipt, Users, UsersRound, X } from "lucide-react";
 import { NAV_GROUPS, type Item } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
@@ -18,28 +18,68 @@ function useActive() {
   };
 }
 
+const linkClass = (on: boolean) =>
+  cn("flex min-h-10 items-center gap-3 rounded-xl px-3 text-[0.93rem] font-medium transition-colors", on ? "bg-brand-wash font-semibold text-brand-deep" : "text-ink-soft hover:bg-line/50 hover:text-ink");
+
+/**
+ * Sidebar, Wave-style: top-level pages with icons, and groups that expand to show their pages. The group
+ * holding the current page is open unless the owner closes it; any group can be opened or closed.
+ */
 export function SideNav() {
   const active = useActive();
+  const [toggled, setToggled] = useState<Record<string, boolean>>({});
   return (
     <nav aria-label="App" className="flex flex-col gap-4 overflow-y-auto">
       <QuickActions variant="side" />
-      {NAV_GROUPS.map((g, i) => (
-        <div key={i}>
-          {g.title && <p className="mb-1 px-3 text-[11px] font-bold uppercase tracking-wider text-muted">{g.title}</p>}
-          <div className="flex flex-col gap-0.5">
-            {g.items.map((item) => {
-              const on = active(item);
-              return (
-                <Link key={item.href} href={item.href} aria-current={on ? "page" : undefined}
-                  className={cn("flex min-h-10 items-center gap-3 rounded-xl px-3 text-[0.93rem] font-medium transition-colors", on ? "bg-brand-wash font-semibold text-brand-deep" : "text-ink-soft hover:bg-line/50 hover:text-ink")}>
+      <ul className="flex flex-col gap-0.5">
+        {NAV_GROUPS.map((g, i) => {
+          if (!g.title || !g.icon || g.items.length === 1) {
+            return g.items.map((item) => (
+              <li key={item.href}>
+                <Link href={item.href} aria-current={active(item) ? "page" : undefined} className={linkClass(active(item))}>
                   <item.icon className="size-[1.1rem]" aria-hidden />
                   {item.label}
                 </Link>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+              </li>
+            ));
+          }
+          const hasActive = g.items.some((item) => active(item));
+          const open = toggled[g.title] ?? hasActive;
+          const Icon = g.icon;
+          const id = `nav-group-${i}`;
+          return (
+            <li key={g.title}>
+              <button
+                type="button"
+                aria-expanded={open}
+                aria-controls={id}
+                onClick={() => setToggled((t) => ({ ...t, [g.title!]: !open }))}
+                className={cn(
+                  "flex min-h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-[0.93rem] transition-colors hover:bg-line/50",
+                  open ? "font-semibold text-ink" : hasActive ? "bg-brand-wash font-semibold text-brand-deep" : "font-medium text-ink-soft hover:text-ink",
+                )}
+              >
+                <Icon className="size-[1.1rem]" aria-hidden />
+                <span className="flex-1">{g.title}</span>
+                <ChevronDown className={cn("size-4 text-muted transition-transform motion-reduce:transition-none", open && "rotate-180")} aria-hidden />
+              </button>
+              <ul id={id} hidden={!open} className="mt-0.5 flex flex-col gap-0.5">
+                {g.items.map((item) => {
+                  const on = active(item);
+                  return (
+                    <li key={item.href}>
+                      <Link href={item.href} aria-current={on ? "page" : undefined}
+                        className={cn("flex min-h-9 items-center rounded-xl pl-[2.6rem] pr-3 text-[0.9rem] transition-colors", on ? "bg-brand-wash font-semibold text-brand-deep" : "text-ink-soft hover:bg-line/50 hover:text-ink")}>
+                        {item.label}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </li>
+          );
+        })}
+      </ul>
     </nav>
   );
 }

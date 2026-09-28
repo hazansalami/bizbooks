@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { Copy, ExternalLink, Pencil, Trash2, XCircle, ArrowRightLeft } from "lucide-react";
 import { requireBusiness } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { canPayOnline, loadFullInvoice, payUrl, publicInvoiceUrl, whatsappMessage } from "@/lib/invoices";
+import { canPayOnline, emailDraft, loadFullInvoice, payUrl, publicInvoiceUrl, whatsappMessage } from "@/lib/invoices";
 import { balanceDue, money, naira } from "@/lib/money";
 import { INVOICE_STATUS, PAYMENT_METHODS } from "@/lib/constants";
 import { daysBetween, formatDate, timeAgo, whatsappLink } from "@/lib/utils";
@@ -23,7 +23,7 @@ const EVENT_LABELS: Record<string, string> = {
 };
 
 export default async function InvoicePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ share?: string }> }) {
-  const { business } = await requireBusiness();
+  const { business, user } = await requireBusiness();
   const { id } = await params;
   const { share } = await searchParams;
   const inv = await loadFullInvoice(id);
@@ -85,6 +85,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
             kind={shareKind}
             highlight={share === "1"}
             whatsappHref={whatsappLink(inv.customer.phone, whatsappMessage(inv, shareKind))}
+            email={{ to: inv.customer.email ?? "", ...emailDraft(inv, shareKind), copyTo: inv.business.email || user.email }}
             link={canPayOnline(inv) ? payUrl(inv.publicToken) : publicInvoiceUrl(inv.publicToken)}
             hasEmail={!!inv.customer.email}
             customerName={inv.customer.name}

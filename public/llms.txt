@@ -81,6 +81,7 @@
 - [Home](/)
 - [Pricing](/pricing) · machine-readable: [/pricing.md](/pricing.md)
 - [Advisors](/advisors)
+- [Get the app](/install): installs from the browser on Android, iPhone and desktop (PWA), no app store
 - [Compare: Zoho Books](/compare/zoho-books) · [Compare: Wave](/compare/wave)
 - [Insights](/insights)
 - [Solutions: Bookkeeping & reports](/solutions/accounting)

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, GripVertical, Plus, Trash2 } from "lucide-react";
 import { saveInvoice } from "@/app/actions/invoices";
 import { SubmitButton, useFormAction, type FormState } from "./form-bits";
 import { Field, Input, inputClass, Notice, Select, Textarea } from "./ui";
@@ -75,6 +75,24 @@ export function InvoiceForm(p: InvoiceFormProps) {
     [lines, discount, applyVat, whtRate, p.vatRate],
   );
 
+  // Reordering: arrow buttons everywhere (touch and keyboard), plus a drag handle with a mouse.
+  const [armed, setArmed] = useState<number | null>(null);
+  const [dragging, setDragging] = useState<number | null>(null);
+  const move = (idx: number, dir: -1 | 1) => setLines((ls) => {
+    const to = idx + dir;
+    if (to < 0 || to >= ls.length) return ls;
+    const next = [...ls];
+    [next[idx], next[to]] = [next[to], next[idx]];
+    return next;
+  });
+  const moveTo = (key: number, to: number) => setLines((ls) => {
+    const from = ls.findIndex((x) => x.key === key);
+    if (from < 0 || from === to) return ls;
+    const next = [...ls];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    return next;
+  });
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const savedFor = (name: string) => p.savedItems.find((i) => i.name.toLowerCase() === name.trim().toLowerCase());
   const payload = JSON.stringify(lines.map(({ description, details, quantity, unitPrice }) => ({ description, details, quantity, unitPrice })));
@@ -168,7 +186,17 @@ export function InvoiceForm(p: InvoiceFormProps) {
         </datalist>
         <ul className="mt-3 space-y-3">
           {lines.map((l, idx) => (
-            <li key={l.key} className="grid grid-cols-[1fr_auto] gap-2 rounded-xl border border-line p-3 sm:grid-cols-[1fr_5rem_8rem_7rem_auto] sm:items-end sm:rounded-none sm:border-0 sm:border-b sm:px-0 sm:pb-4 sm:pt-0">
+            <li
+              key={l.key}
+              draggable={armed === l.key}
+              onDragStart={(ev) => { setDragging(l.key); ev.dataTransfer.effectAllowed = "move"; }}
+              onDragOver={(ev) => { if (dragging == null) return; ev.preventDefault(); if (dragging !== l.key) moveTo(dragging, idx); }}
+              onDragEnd={() => { setDragging(null); setArmed(null); }}
+              className={cn(
+                "grid grid-cols-[1fr_auto] gap-2 rounded-xl border border-line p-3 sm:grid-cols-[1fr_5rem_8rem_7rem_auto] sm:items-end sm:rounded-none sm:border-0 sm:border-b sm:px-0 sm:pb-4 sm:pt-0",
+                dragging === l.key && "opacity-50",
+              )}
+            >
               <label className="col-span-2 sm:col-span-1">
                 <span className={cn("mb-1 block text-xs font-semibold text-muted", idx > 0 && "sm:sr-only")}>Item or service</span>
                 <input
@@ -199,14 +227,37 @@ export function InvoiceForm(p: InvoiceFormProps) {
               <p className="num flex min-h-12 items-center justify-end font-semibold sm:justify-end" aria-label={`Item ${idx + 1} amount`}>
                 {fmt((parseAmount(l.quantity) || 0) * (parseAmount(l.unitPrice) || 0))}
               </p>
-              <button
-                type="button"
-                onClick={() => setLines((ls) => (ls.length > 1 ? ls.filter((x) => x.key !== l.key) : [blank()]))}
-                aria-label={`Remove item ${idx + 1}`}
-                className="col-start-2 row-start-2 grid size-12 place-items-center self-end justify-self-end rounded-xl text-muted hover:bg-danger-wash hover:text-danger sm:col-start-auto sm:row-start-auto"
-              >
-                <Trash2 className="size-5" aria-hidden />
-              </button>
+              <div className="col-start-2 row-start-2 flex items-center gap-0.5 self-end justify-self-end sm:col-start-auto sm:row-start-auto">
+                {lines.length > 1 && (
+                  <>
+                    <span
+                      onPointerDown={() => setArmed(l.key)}
+                      onPointerUp={() => setArmed(null)}
+                      title="Drag to reorder"
+                      aria-hidden
+                      className="hidden size-10 cursor-grab place-items-center rounded-xl text-muted hover:bg-canvas active:cursor-grabbing lg:grid"
+                    >
+                      <GripVertical className="size-5" />
+                    </span>
+                    <button type="button" onClick={() => move(idx, -1)} disabled={idx === 0} aria-label={`Move item ${idx + 1} up`}
+                      className="grid size-10 place-items-center rounded-xl text-muted hover:bg-canvas hover:text-ink disabled:opacity-30">
+                      <ArrowUp className="size-4" aria-hidden />
+                    </button>
+                    <button type="button" onClick={() => move(idx, 1)} disabled={idx === lines.length - 1} aria-label={`Move item ${idx + 1} down`}
+                      className="grid size-10 place-items-center rounded-xl text-muted hover:bg-canvas hover:text-ink disabled:opacity-30">
+                      <ArrowDown className="size-4" aria-hidden />
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setLines((ls) => (ls.length > 1 ? ls.filter((x) => x.key !== l.key) : [blank()]))}
+                  aria-label={`Remove item ${idx + 1}`}
+                  className="grid size-10 place-items-center rounded-xl text-muted hover:bg-danger-wash hover:text-danger"
+                >
+                  <Trash2 className="size-5" aria-hidden />
+                </button>
+              </div>
               <label className="col-span-2 sm:col-span-4">
                 <textarea
                   aria-label={`Item ${idx + 1} description`}
