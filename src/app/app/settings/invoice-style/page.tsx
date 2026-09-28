@@ -104,13 +104,13 @@ async function sampleInvoice(businessId: string): Promise<FullInvoice> {
     id: "sample", businessId, business, customerId: "sample", kind: "INVOICE", number: `${business.invoicePrefix}-0042`,
     poNumber: "PO-7781", title: "Website redesign & renewal", summary: "Upgrade of the company website plus a year of management and hosting.",
     importSource: null, depositPercent: null, acceptedAt: null, acceptedBy: null, depositForId: null, status: "SENT",
-    issueDate: issue, dueDate: addDays(issue, business.paymentTermsDays), currency: "NGN", subtotal, discount: 0, vatRate, vatAmount,
+    issueDate: issue, dueDate: addDays(issue, business.paymentTermsDays), currency: "NGN", exchangeRate: 1, subtotal, discount: 0, vatRate, vatAmount,
     whtRate: 0, whtAmount: 0, total: subtotal + vatAmount, amountPaid: 0, notes: null, publicToken: "sample",
     sentAt: issue, viewedAt: null, paidAt: null, lastReminderAt: null, reminderCount: 0, recurringId: null, convertedFromId: null,
     createdAt: issue, updatedAt: issue, items,
     customer: {
       id: "sample", businessId, name: "Arthur Group Ltd", contactName: "Head of Finance", email: "accounts@arthurgroup.ng", phone: null,
-      address: "12 Adeola Odeku Street, Victoria Island, Lagos", tin: null, notes: null, createdAt: issue, updatedAt: issue,
+      address: "12 Adeola Odeku Street, Victoria Island, Lagos", tin: null, notes: null, currency: null, createdAt: issue, updatedAt: issue,
     },
   };
 }

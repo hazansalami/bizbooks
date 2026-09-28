@@ -1,7 +1,8 @@
 import "server-only";
 import { db } from "./db";
 import { Prisma } from "@/generated/prisma/client";
-import { balanceDue, computeTotals, naira, round2, type LineInput } from "./money";
+import { balanceDue, computeTotals, money, round2, type LineInput } from "./money";
+import { GATEWAY_CURRENCIES } from "./currency";
 import { layout, sendEmail, escapeHtml as esc } from "./email";
 import { siteUrl } from "./site-url";
 import { addDays, formatDate, greetingName, randomToken } from "./utils";
@@ -36,6 +37,7 @@ export type NewInvoice = {
   recurringId?: string | null; convertedFromId?: string | null;
   poNumber?: string | null; depositPercent?: number | null; depositForId?: string | null;
   title?: string | null; summary?: string | null;
+  currency?: string; exchangeRate?: number;
 };
 
 export async function createInvoice(input: NewInvoice, tx?: Tx) {
@@ -63,6 +65,8 @@ export async function createInvoice(input: NewInvoice, tx?: Tx) {
         convertedFromId: input.convertedFromId ?? null,
         poNumber: input.poNumber ?? null,
         title: input.title ?? null,
+        currency: input.currency ?? "NGN",
+        exchangeRate: input.currency && input.currency !== "NGN" ? input.exchangeRate ?? 1 : 1,
         summary: input.summary ?? null,
         depositPercent: input.kind === "QUOTE" ? input.depositPercent ?? null : null,
         depositForId: input.depositForId ?? null,
@@ -84,7 +88,8 @@ export async function createInvoice(input: NewInvoice, tx?: Tx) {
  * Record money against an invoice. Safe to call twice with the same gateway reference
  * (redirect and webhook often both arrive): the unique reference makes the second call a no-op.
  */
-export async function applyPayment(invoiceId: string, p: { amount: number; method: string; reference?: string | null; paidAt?: Date; note?: string | null }) {
+/** amount is in the invoice's currency; exchangeRate (naira per unit) defaults to the invoice's own rate. */
+export async function applyPayment(invoiceId: string, p: { amount: number; method: string; reference?: string | null; paidAt?: Date; note?: string | null; exchangeRate?: number }) {
   const amount = round2(p.amount);
   if (!(amount > 0)) return { ok: false as const, error: "Enter an amount above zero." };
   try {
@@ -95,6 +100,7 @@ export async function applyPayment(invoiceId: string, p: { amount: number; metho
       await tx.payment.create({
         data: {
           businessId: inv.businessId, invoiceId, amount, method: p.method, reference: p.reference ?? null,
+          exchangeRate: inv.currency === "NGN" ? 1 : p.exchangeRate && p.exchangeRate > 0 ? p.exchangeRate : inv.exchangeRate,
           paidAt: p.paidAt ?? new Date(), note: p.note ?? null,
         },
       });
@@ -107,7 +113,7 @@ export async function applyPayment(invoiceId: string, p: { amount: number; metho
           status: fullyPaid ? "PAID" : "PARTIAL",
           paidAt: fullyPaid ? p.paidAt ?? new Date() : null,
           sentAt: inv.sentAt ?? new Date(),
-          events: { create: { type: "PAYMENT", note: `${naira(amount)} by ${p.method.replace("_", " ").toLowerCase()}` } },
+          events: { create: { type: "PAYMENT", note: `${money(amount, inv.currency)} by ${p.method.replace("_", " ").toLowerCase()}` } },
         },
       });
       return { ok: true as const, fullyPaid };
@@ -135,8 +141,13 @@ export async function loadFullInvoice(id: string) {
   return db.invoice.findUnique({ where: { id }, include: fullInclude });
 }
 
+/** An enabled gateway that can charge in this invoice's currency. */
+export function gatewayFor(inv: FullInvoice) {
+  return inv.business.gateways.find((g) => g.enabled && (GATEWAY_CURRENCIES[g.provider] ?? ["NGN"]).includes(inv.currency));
+}
+
 export function canPayOnline(inv: FullInvoice) {
-  return inv.kind === "INVOICE" && inv.business.gateways.some((g) => g.enabled);
+  return inv.kind === "INVOICE" && !!gatewayFor(inv);
 }
 
 function bankLines(inv: FullInvoice) {
@@ -150,12 +161,12 @@ export function whatsappMessage(inv: FullInvoice, kind: "send" | "reminder" = "s
   const due = balanceDue(inv);
   const first = greetingName(inv.customer.name);
   if (inv.kind === "QUOTE") {
-    return `Hello ${first}, here is our quote ${inv.number} for ${naira(inv.total)} from ${inv.business.name}:\n${publicInvoiceUrl(inv.publicToken)}`;
+    return `Hello ${first}, here is our quote ${inv.number} for ${money(inv.total, inv.currency)} from ${inv.business.name}:\n${publicInvoiceUrl(inv.publicToken)}`;
   }
   const lines = [
     kind === "send"
-      ? `Hello ${first}, here is invoice ${inv.number} from ${inv.business.name} for ${naira(due)}, due ${formatDate(inv.dueDate)}.`
-      : `Hello ${first}, a friendly reminder that invoice ${inv.number} for ${naira(due)} ${inv.dueDate < new Date() ? "is now overdue" : `is due ${formatDate(inv.dueDate)}`}.`,
+      ? `Hello ${first}, here is invoice ${inv.number} from ${inv.business.name} for ${money(due, inv.currency)}, due ${formatDate(inv.dueDate)}.`
+      : `Hello ${first}, a friendly reminder that invoice ${inv.number} for ${money(due, inv.currency)} ${inv.dueDate < new Date() ? "is now overdue" : `is due ${formatDate(inv.dueDate)}`}.`,
   ];
   if (canPayOnline(inv)) lines.push(`Pay by card, transfer or USSD in one tap: ${payUrl(inv.publicToken)}`);
   else lines.push(`View and pay: ${publicInvoiceUrl(inv.publicToken)}`);
@@ -179,8 +190,8 @@ export async function emailInvoice(inv: FullInvoice, kind: "send" | "reminder" =
   const paragraphs = [
     `Hello ${esc(greetingName(inv.customer.name))},`,
     isQuote
-      ? `${esc(inv.business.name)} has sent you a quote for <strong>${naira(inv.total)}</strong>.`
-      : `${kind === "reminder" ? "Just a reminder: " : ""}${esc(inv.business.name)} has sent you an invoice for <strong>${naira(due)}</strong>, due on <strong>${formatDate(inv.dueDate)}</strong>.`,
+      ? `${esc(inv.business.name)} has sent you a quote for <strong>${money(inv.total, inv.currency)}</strong>.`
+      : `${kind === "reminder" ? "Just a reminder: " : ""}${esc(inv.business.name)} has sent you an invoice for <strong>${money(due, inv.currency)}</strong>, due on <strong>${formatDate(inv.dueDate)}</strong>.`,
   ];
   const banks = bankLines(inv);
   const after = !isQuote && banks.length
@@ -191,7 +202,7 @@ export async function emailInvoice(inv: FullInvoice, kind: "send" | "reminder" =
     heading,
     paragraphs,
     button: isQuote ? { label: "View quote", href: publicInvoiceUrl(inv.publicToken) }
-      : online ? { label: `Pay ${naira(due)} now`, href: payUrl(inv.publicToken) }
+      : online ? { label: `Pay ${money(due, inv.currency)} now`, href: payUrl(inv.publicToken) }
       : { label: "View invoice", href: publicInvoiceUrl(inv.publicToken) },
     after,
     color: isPro(inv.business) ? inv.business.brandColor : undefined,

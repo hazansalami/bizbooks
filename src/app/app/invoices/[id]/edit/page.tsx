@@ -15,7 +15,7 @@ export default async function EditInvoice({ params }: { params: Promise<{ id: st
   if (!inv) notFound();
   if (inv.amountPaid > 0 || inv.status === "VOID" || inv.status === "CONVERTED") redirect(`/app/invoices/${id}`);
   const [customers, items] = await Promise.all([
-    db.customer.findMany({ where: { businessId: business.id }, orderBy: { name: "asc" }, select: { id: true, name: true, phone: true } }),
+    db.customer.findMany({ where: { businessId: business.id }, orderBy: { name: "asc" }, select: { id: true, name: true, phone: true, currency: true } }),
     db.item.findMany({ where: { businessId: business.id }, orderBy: { name: "asc" }, select: { name: true, description: true, unitPrice: true } }),
   ]);
   return (
@@ -29,13 +29,21 @@ export default async function EditInvoice({ params }: { params: Promise<{ id: st
         vatRate={business.vatRate}
         termsDays={business.paymentTermsDays}
         pro={isPro(business)}
+        lastRates={await lastRates(business.id)}
         initial={{
           id: inv.id, customerId: inv.customerId, issueDate: dateInput(inv.issueDate), dueDate: dateInput(inv.dueDate),
           discount: inv.discount, vatRate: inv.vatRate, whtRate: inv.whtRate, notes: inv.notes ?? "", poNumber: inv.poNumber ?? "", depositPercent: inv.depositPercent,
           items: inv.items.map((i) => ({ description: i.description, details: i.details, quantity: i.quantity, unitPrice: i.unitPrice })),
-          title: inv.title ?? "", summary: inv.summary ?? "",
+          title: inv.title ?? "", summary: inv.summary ?? "", currency: inv.currency, exchangeRate: inv.exchangeRate,
         }}
       />
     </>
   );
+}
+
+async function lastRates(businessId: string) {
+  const recent = await db.invoice.findMany({ where: { businessId, currency: { not: "NGN" } }, orderBy: { createdAt: "desc" }, select: { currency: true, exchangeRate: true }, take: 50 });
+  const out: Record<string, number> = {};
+  for (const r of recent) if (!(r.currency in out)) out[r.currency] = r.exchangeRate;
+  return out;
 }

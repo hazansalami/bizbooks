@@ -3,13 +3,15 @@ import { db } from "./db";
 import { decryptSecret } from "./crypto";
 import { newReference, startCheckout, verifyPayment, type Provider } from "./gateways";
 import { applyPayment, publicInvoiceUrl, type FullInvoice } from "./invoices";
-import { balanceDue, naira } from "./money";
+import { GATEWAY_CURRENCIES } from "./currency";
+import { balanceDue, money } from "./money";
 import { siteUrl } from "./site-url";
 import { layout, sendEmail } from "./email";
 
+/** Paystack first, then Flutterwave, among gateways that can charge in the invoice's currency. */
 export function pickGateway(inv: FullInvoice) {
-  const enabled = inv.business.gateways.filter((g) => g.enabled);
-  return enabled.find((g) => g.provider === "PAYSTACK") ?? enabled[0] ?? null;
+  const usable = inv.business.gateways.filter((g) => g.enabled && (GATEWAY_CURRENCIES[g.provider] ?? ["NGN"]).includes(inv.currency));
+  return usable.find((g) => g.provider === "PAYSTACK") ?? usable[0] ?? null;
 }
 
 export async function startInvoiceCheckout(inv: FullInvoice, email: string) {
@@ -25,6 +27,7 @@ export async function startInvoiceCheckout(inv: FullInvoice, email: string) {
   return startCheckout(provider, decryptSecret(gateway.secretKeyEnc), {
     reference: newReference(inv.id),
     amount,
+    currency: inv.currency,
     email,
     customerName: inv.customer.name,
     phone: inv.customer.phone,
@@ -47,20 +50,20 @@ export async function settleReference(invoiceId: string, provider: Provider, ref
   const gateway = inv?.business.gateways.find((g) => g.provider === provider);
   if (!inv || !gateway) return { ok: false as const };
   const v = await verifyPayment(provider, decryptSecret(gateway.secretKeyEnc), reference);
-  if (!v || !v.paid || v.currency !== "NGN" || v.reference !== reference) return { ok: false as const };
+  if (!v || !v.paid || v.currency !== inv.currency || v.reference !== reference) return { ok: false as const };
   const r = await applyPayment(inv.id, { amount: v.amount, method: provider, reference, paidAt: v.paidAt, note: `Paid online via ${provider === "PAYSTACK" ? "Paystack" : "Flutterwave"}` });
   if (r.ok && !("duplicate" in r && r.duplicate)) {
     const to = inv.business.email || inv.business.owner.email;
     const { html, text } = layout({
-      heading: `${inv.customer.name} paid ${naira(v.amount)}`,
+      heading: `${inv.customer.name} paid ${money(v.amount, inv.currency)}`,
       paragraphs: [`Invoice ${inv.number} ${r.fullyPaid ? "is now fully paid" : "has a new part payment"}. The money is in your ${provider === "PAYSTACK" ? "Paystack" : "Flutterwave"} account and will settle to your bank on your usual schedule.`],
       button: { label: "View invoice", href: new URL(`/app/invoices/${inv.id}`, siteUrl()).toString() },
     });
-    await sendEmail({ to, subject: `Payment received: ${naira(v.amount)} for ${inv.number}`, html, text });
+    await sendEmail({ to, subject: `Payment received: ${money(v.amount, inv.currency)} for ${inv.number}`, html, text });
     if (inv.customer.email) {
       const receipt = layout({
         heading: `Payment received, thank you`,
-        paragraphs: [`${inv.business.name} has received your payment of <strong>${naira(v.amount)}</strong> for invoice ${inv.number}.`],
+        paragraphs: [`${inv.business.name} has received your payment of <strong>${money(v.amount, inv.currency)}</strong> for invoice ${inv.number}.`],
         button: { label: "View receipt", href: publicInvoiceUrl(inv.publicToken) },
       });
       await sendEmail({ to: inv.customer.email, subject: `Receipt for ${inv.number} from ${inv.business.name}`, html: receipt.html, text: receipt.text, replyTo: inv.business.email, fromName: inv.business.name });

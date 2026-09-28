@@ -20,7 +20,7 @@ export async function startUpgrade(form: FormData) {
   const reference = `bbsub-${business.id}-${Date.now().toString(36)}`;
   await db.platformPayment.create({ data: { businessId: business.id, reference, amount, months } });
   const r = await startCheckout("PAYSTACK", key, {
-    reference, amount, email: business.email || user.email, customerName: user.fullName,
+    reference, amount, currency: "NGN", email: business.email || user.email, customerName: user.fullName,
     callbackUrl: new URL("/api/billing/callback", siteUrl()).toString(),
     businessName: "BizBooks Pro", invoiceNumber: `${months} month${months > 1 ? "s" : ""}`, invoiceId: business.id,
   });

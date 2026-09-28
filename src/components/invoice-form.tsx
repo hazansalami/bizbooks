@@ -5,12 +5,13 @@ import { Plus, Trash2 } from "lucide-react";
 import { saveInvoice } from "@/app/actions/invoices";
 import { SubmitButton, useFormAction, type FormState } from "./form-bits";
 import { Field, Input, inputClass, Notice, Select, Textarea } from "./ui";
-import { computeTotals, naira, parseAmount } from "@/lib/money";
+import { computeTotals, money, naira, parseAmount } from "@/lib/money";
+import { CURRENCIES } from "@/lib/currency";
 import { TAX } from "@/lib/constants";
 import { addDays, cn, dateInput } from "@/lib/utils";
 
 type Line = { key: number; description: string; details: string; quantity: string; unitPrice: string };
-type Customer = { id: string; name: string; phone: string | null };
+type Customer = { id: string; name: string; phone: string | null; currency: string | null };
 
 export type InvoiceFormProps = {
   kind: "INVOICE" | "QUOTE";
@@ -20,10 +21,12 @@ export type InvoiceFormProps = {
   vatRate: number;
   termsDays: number;
   pro: boolean;
+  /** Last rate used per currency, to prefill the exchange rate. */
+  lastRates: Record<string, number>;
   initial?: {
     id: string; customerId: string; issueDate: string; dueDate: string; discount: number; vatRate: number; whtRate: number;
     notes: string; items: { description: string; details: string | null; quantity: number; unitPrice: number }[]; poNumber: string; depositPercent: number | null;
-    title: string; summary: string;
+    title: string; summary: string; currency: string; exchangeRate: number;
   };
   preselectCustomer?: string;
 };
@@ -45,6 +48,14 @@ export function InvoiceForm(p: InvoiceFormProps) {
   );
   const [issueDate, setIssueDate] = useState(p.initial?.issueDate ?? dateInput(today));
   const [dueDate, setDueDate] = useState(p.initial?.dueDate ?? dateInput(addDays(today, p.termsDays)));
+  const startCustomer = p.customers.find((c) => c.id === (p.initial?.customerId ?? p.preselectCustomer));
+  const [currency, setCurrency] = useState(p.initial?.currency ?? startCustomer?.currency ?? "NGN");
+  const [rate, setRate] = useState(String(p.initial?.exchangeRate && p.initial.exchangeRate !== 1 ? p.initial.exchangeRate : p.lastRates[p.initial?.currency ?? startCustomer?.currency ?? ""] ?? ""));
+  const pickCurrency = (c: string) => {
+    setCurrency(c);
+    if (c !== "NGN") setRate((r) => (r && currency === c ? r : String(p.lastRates[c] ?? "")));
+  };
+  const fmt = (n: number) => money(n, currency);
   const [applyVat, setApplyVat] = useState(p.initial ? p.initial.vatRate > 0 : p.vatRegistered);
   const [discount, setDiscount] = useState(p.initial?.discount ? String(p.initial.discount) : "");
   const [whtRate, setWhtRate] = useState(String(p.initial?.whtRate ?? 0));
@@ -69,6 +80,8 @@ export function InvoiceForm(p: InvoiceFormProps) {
       <input type="hidden" name="kind" value={p.kind} />
       {p.initial && <input type="hidden" name="id" value={p.initial.id} />}
       <input type="hidden" name="items" value={payload} />
+      <input type="hidden" name="currency" value={currency} />
+      <input type="hidden" name="exchangeRate" value={currency === "NGN" ? "1" : rate} />
       {state.message && <Notice tone="danger">{state.message}</Notice>}
 
       <section className="rounded-2xl border border-line bg-paper p-4 sm:p-6">
@@ -76,7 +89,11 @@ export function InvoiceForm(p: InvoiceFormProps) {
         <div className="mt-3 space-y-4">
           {p.customers.length > 0 && (
             <Field label="Client" name="customerId" required error={customerId !== "new" ? e.customer : undefined}>
-              <Select name="customerId" value={customerId} onChange={(ev) => setCustomerId(ev.target.value)} error={e.customer}>
+              <Select name="customerId" value={customerId} onChange={(ev) => {
+                setCustomerId(ev.target.value);
+                const c = p.customers.find((x) => x.id === ev.target.value);
+                if (c?.currency && !p.initial) pickCurrency(c.currency);
+              }} error={e.customer}>
                 <option value="" disabled>Choose a client</option>
                 {p.customers.map((c) => <option key={c.id} value={c.id}>{c.name}{c.phone ? ` · ${c.phone}` : ""}</option>)}
                 <option value="new">+ Add a new client</option>
@@ -117,6 +134,30 @@ export function InvoiceForm(p: InvoiceFormProps) {
             </Field>
           </div>
         )}
+        <div className="mt-3 flex flex-wrap items-end gap-3">
+          <label className="text-sm">
+            <span className="mb-1 block text-xs font-semibold text-muted">Currency</span>
+            <select value={currency} onChange={(ev) => pickCurrency(ev.target.value)} aria-label="Invoice currency" className={cn(inputClass, "w-auto pr-8")}>
+              {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code} · {c.name}</option>)}
+            </select>
+          </label>
+          {currency !== "NGN" && (
+            <label className="text-sm">
+              <span className="mb-1 block text-xs font-semibold text-muted">Exchange rate: 1 {currency} =</span>
+              <span className="flex items-center gap-2">
+                <span className="font-semibold">₦</span>
+                <input inputMode="decimal" value={rate} onChange={(ev) => setRate(ev.target.value)} placeholder="e.g. 1,550" aria-label={`Naira per 1 ${currency}`} className={cn(inputClass, "num w-36 text-right")} />
+              </span>
+            </label>
+          )}
+        </div>
+        {currency !== "NGN" && (
+          <p className="mt-2 text-sm text-muted">
+            Your client sees {currency}. Your books stay in naira: this invoice counts as {naira((parseAmount(rate) || 0) * totals.total)} in reports.
+            When the money arrives you can record the day&apos;s actual rate.
+          </p>
+        )}
+        {e.exchangeRate && <p role="alert" className="mt-2 text-sm font-medium text-danger">{e.exchangeRate}</p>}
         <datalist id="saved-items">
           {p.savedItems.map((i) => <option key={i.name} value={i.name} />)}
         </datalist>
@@ -147,11 +188,11 @@ export function InvoiceForm(p: InvoiceFormProps) {
                 <input className={cn(inputClass, "num text-right")} inputMode="decimal" value={l.quantity} aria-label={`Item ${idx + 1} quantity`} onChange={(ev) => update(l.key, { quantity: ev.target.value })} />
               </label>
               <label>
-                <span className={cn("mb-1 block text-xs font-semibold text-muted", idx > 0 && "sm:sr-only")}>Price (₦)</span>
+                <span className={cn("mb-1 block text-xs font-semibold text-muted", idx > 0 && "sm:sr-only")}>Price ({currency})</span>
                 <input className={cn(inputClass, "num text-right")} inputMode="decimal" value={l.unitPrice} placeholder="0" aria-label={`Item ${idx + 1} price`} onChange={(ev) => update(l.key, { unitPrice: ev.target.value })} />
               </label>
               <p className="num flex min-h-12 items-center justify-end font-semibold sm:justify-end" aria-label={`Item ${idx + 1} amount`}>
-                {naira((parseAmount(l.quantity) || 0) * (parseAmount(l.unitPrice) || 0))}
+                {fmt((parseAmount(l.quantity) || 0) * (parseAmount(l.unitPrice) || 0))}
               </p>
               <button
                 type="button"
@@ -211,12 +252,12 @@ export function InvoiceForm(p: InvoiceFormProps) {
         </div>
 
         <dl className="num ml-auto mt-4 max-w-xs space-y-1.5 text-sm">
-          <div className="flex justify-between text-ink-soft"><dt>Subtotal</dt><dd>{naira(totals.subtotal)}</dd></div>
-          {totals.discount > 0 && <div className="flex justify-between text-ink-soft"><dt>Discount</dt><dd>−{naira(totals.discount)}</dd></div>}
-          {totals.vatAmount > 0 && <div className="flex justify-between text-ink-soft"><dt>VAT</dt><dd>{naira(totals.vatAmount)}</dd></div>}
-          <div className="flex justify-between border-t border-line pt-2 text-lg font-bold"><dt>Total</dt><dd>{naira(totals.total)}</dd></div>
+          <div className="flex justify-between text-ink-soft"><dt>Subtotal</dt><dd>{fmt(totals.subtotal)}</dd></div>
+          {totals.discount > 0 && <div className="flex justify-between text-ink-soft"><dt>Discount</dt><dd>−{fmt(totals.discount)}</dd></div>}
+          {totals.vatAmount > 0 && <div className="flex justify-between text-ink-soft"><dt>VAT</dt><dd>{fmt(totals.vatAmount)}</dd></div>}
+          <div className="flex justify-between border-t border-line pt-2 text-lg font-bold"><dt>Total</dt><dd>{fmt(totals.total)}</dd></div>
           {totals.whtAmount > 0 && (
-            <div className="flex justify-between text-ink-soft"><dt>Client pays after WHT</dt><dd>{naira(totals.amountDue)}</dd></div>
+            <div className="flex justify-between text-ink-soft"><dt>Client pays after WHT</dt><dd>{fmt(totals.amountDue)}</dd></div>
           )}
         </dl>
       </section>
@@ -260,7 +301,7 @@ export function InvoiceForm(p: InvoiceFormProps) {
       </section>
 
       <div className="sticky bottom-20 z-10 flex flex-col-reverse gap-3 rounded-2xl border border-line bg-paper/95 p-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between lg:bottom-4">
-        <p className="num text-center font-bold sm:text-left">Total {naira(totals.total)}</p>
+        <p className="num text-center font-bold sm:text-left">Total {fmt(totals.total)}</p>
         <div className="flex flex-col-reverse gap-2 sm:flex-row">
           <SubmitButton variant="secondary" name="intent" value="draft" pending={pending}>Save as draft</SubmitButton>
           <SubmitButton name="intent" value="send" pending={pending} pendingText="Saving…">

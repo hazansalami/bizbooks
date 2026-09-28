@@ -7,6 +7,7 @@ import { requireBusiness } from "@/lib/auth";
 import { applyPayment, createInvoice, emailInvoice, loadFullInvoice, markSent, refreshInvoicePaid } from "@/lib/invoices";
 import { computeTotals, parseAmount, round2, type LineInput } from "@/lib/money";
 import { PAYMENT_METHODS } from "@/lib/constants";
+import { isCurrency } from "@/lib/currency";
 import { isPro } from "@/lib/plan";
 import { dateOrNull, str } from "@/lib/utils";
 import type { FormState } from "@/components/form-bits";
@@ -67,6 +68,9 @@ export async function saveInvoice(_: FormState, form: FormData): Promise<FormSta
   const whtRate = [0, 2, 5, 10].includes(Number(str(form, "whtRate"))) ? Number(str(form, "whtRate")) : 0;
   if (discount < 0) errors.discount = "Discount can't be negative.";
   if (!errors.items && computeTotals(lines, discount, 0, 0).subtotal < 0) errors.items = "The total can't be below zero.";
+  const currency = isCurrency(str(form, "currency")) ? str(form, "currency") : "NGN";
+  const exchangeRate = currency === "NGN" ? 1 : parseAmount(str(form, "exchangeRate"));
+  if (currency !== "NGN" && !(exchangeRate > 0)) errors.exchangeRate = `Enter how many naira 1 ${currency} is worth, so your reports stay accurate.`;
   const poNumber = str(form, "poNumber") || null;
   const depositRaw = Number(str(form, "depositPercent"));
   const depositPercent = kind === "QUOTE" && isPro(business) && depositRaw > 0 && depositRaw < 100 ? Math.round(depositRaw) : null;
@@ -76,7 +80,10 @@ export async function saveInvoice(_: FormState, form: FormData): Promise<FormSta
   if (customerId === "new" || !customerId) {
     const phone = str(form, "newCustomerPhone");
     const email = str(form, "newCustomerEmail").toLowerCase();
-    customerId = (await db.customer.create({ data: { businessId: business.id, name: str(form, "newCustomerName"), phone: phone || null, email: email || null } })).id;
+    customerId = (await db.customer.create({ data: { businessId: business.id, name: str(form, "newCustomerName"), phone: phone || null, email: email || null, currency: currency === "NGN" ? null : currency } })).id;
+  } else if (currency !== "NGN") {
+    // Remember a client's currency the first time they're billed in it.
+    await db.customer.updateMany({ where: { id: customerId, businessId: business.id, currency: null }, data: { currency } });
   }
 
   const notes = str(form, "notes") || null;
@@ -95,13 +102,13 @@ export async function saveInvoice(_: FormState, form: FormData): Promise<FormSta
         where: { id },
         data: {
           customerId, issueDate, dueDate: dueDate!, subtotal: t.subtotal, discount: t.discount, vatRate, vatAmount: t.vatAmount,
-          whtRate, whtAmount: t.whtAmount, total: t.total, notes, poNumber, title, summary, depositPercent: inv.kind === "QUOTE" ? depositPercent : null,
+          whtRate, whtAmount: t.whtAmount, total: t.total, notes, poNumber, title, summary, currency, exchangeRate, depositPercent: inv.kind === "QUOTE" ? depositPercent : null,
           items: { create: lines.map((l, i) => ({ description: l.description, details: l.details, quantity: l.quantity, unitPrice: l.unitPrice, amount: round2(l.quantity * l.unitPrice), position: i })) },
         },
       }),
     ]);
   } else {
-    invoiceId = (await createInvoice({ businessId: business.id, customerId, kind, issueDate, dueDate: dueDate!, lines, discount, vatRate, whtRate, notes, poNumber, depositPercent, title, summary })).id;
+    invoiceId = (await createInvoice({ businessId: business.id, customerId, kind, issueDate, dueDate: dueDate!, lines, discount, vatRate, whtRate, notes, poNumber, depositPercent, title, summary, currency, exchangeRate })).id;
   }
 
   // Remember new line items so they autocomplete next time.
@@ -143,7 +150,8 @@ export async function recordPayment(_: FormState, form: FormData): Promise<FormS
   const values = { amount: str(form, "amount"), method, note: str(form, "note"), paidAt: str(form, "paidAt") };
   if (!(amount > 0)) return { errors: { amount: "Enter the amount you received." }, values };
   if (!(method in PAYMENT_METHODS)) return { errors: { method: "Choose how they paid." }, values };
-  const r = await applyPayment(inv.id, { amount, method, paidAt: dateOrNull(form, "paidAt") ?? new Date(), note: str(form, "note") || null });
+  const dayRate = parseAmount(str(form, "exchangeRate"));
+  const r = await applyPayment(inv.id, { amount, method, paidAt: dateOrNull(form, "paidAt") ?? new Date(), note: str(form, "note") || null, exchangeRate: dayRate > 0 ? dayRate : undefined });
   if (!r.ok) return { message: r.error, values };
   revalidatePath(`/app/invoices/${inv.id}`);
   return { ok: true, message: r.fullyPaid ? "Payment recorded. This invoice is now fully paid." : "Payment recorded." };
@@ -195,7 +203,7 @@ export async function duplicateInvoice(form: FormData) {
     dueDate: new Date(issue.getTime() + business.paymentTermsDays * 86400000),
     lines: items.map((i) => ({ description: i.description, details: i.details, quantity: i.quantity, unitPrice: i.unitPrice })),
     discount: inv.discount, vatRate: inv.vatRate, whtRate: inv.whtRate, notes: inv.notes, depositPercent: inv.depositPercent,
-    title: inv.title, summary: inv.summary, poNumber: inv.poNumber,
+    title: inv.title, summary: inv.summary, poNumber: inv.poNumber, currency: inv.currency, exchangeRate: inv.exchangeRate,
   });
   redirect(`/app/invoices/${copy.id}/edit`);
 }
@@ -215,7 +223,7 @@ export async function convertQuote(form: FormData) {
     const n = await createInvoice({
       businessId: business.id, customerId: inv.customerId, kind: "INVOICE", issueDate: issue,
       dueDate: new Date(issue.getTime() + business.paymentTermsDays * 86400000),
-      lines, discount: inv.discount, vatRate: inv.vatRate, whtRate: inv.whtRate, notes: inv.notes, convertedFromId: inv.id, poNumber: inv.poNumber, title: inv.title, summary: inv.summary,
+      lines, discount: inv.discount, vatRate: inv.vatRate, whtRate: inv.whtRate, notes: inv.notes, convertedFromId: inv.id, poNumber: inv.poNumber, title: inv.title, summary: inv.summary, currency: inv.currency, exchangeRate: inv.exchangeRate,
     }, tx);
     await tx.invoice.update({ where: { id: inv.id }, data: { status: "CONVERTED", events: { create: { type: "CONVERTED", note: n.number } } } });
     return n;

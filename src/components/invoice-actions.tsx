@@ -41,7 +41,7 @@ export function SharePanel({ id, whatsappHref, link, hasEmail, customerName, kin
   );
 }
 
-export function RecordPayment({ id, balance }: { id: string; balance: number }) {
+export function RecordPayment({ id, balance, currency = "NGN", invoiceRate = 1 }: { id: string; balance: number; currency?: string; invoiceRate?: number }) {
   const [open, setOpen] = useState(false);
   const { state, onSubmit, pending } = useFormAction<FormState>(recordPayment, {});
   const e = state.errors ?? {};
@@ -59,7 +59,7 @@ export function RecordPayment({ id, balance }: { id: string; balance: number }) 
       <input type="hidden" name="id" value={id} />
       {state.message && <Notice tone={state.ok ? "brand" : "danger"}>{state.message}</Notice>}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Amount received (₦)" name="amount" required error={e.amount}>
+        <Field label={`Amount received (${currency})`} name="amount" required error={e.amount}>
           <Input name="amount" inputMode="decimal" defaultValue={state.ok ? "" : state.values?.amount ?? String(balance)} error={e.amount} className="num" />
         </Field>
         <Field label="How did they pay?" name="method" required error={e.method}>
@@ -71,6 +71,11 @@ export function RecordPayment({ id, balance }: { id: string; balance: number }) 
           <Input name="paidAt" type="date" defaultValue={state.values?.paidAt ?? dateInput(new Date())} />
         </Field>
       </div>
+      {currency !== "NGN" && (
+        <Field label={`Exchange rate on the day: ₦ per 1 ${currency}`} name="exchangeRate" hint={`The invoice used ₦${invoiceRate.toLocaleString("en-NG")}. Use what your bank actually converted at, so cash reports match your statement.`}>
+          <Input name="exchangeRate" inputMode="decimal" defaultValue={state.values?.exchangeRate ?? String(invoiceRate)} className="num sm:max-w-48" />
+        </Field>
+      )}
       <Field label="Note" name="note">
         <Input name="note" defaultValue={state.ok ? "" : state.values?.note} placeholder="e.g. Paid part in cash at the shop" />
       </Field>

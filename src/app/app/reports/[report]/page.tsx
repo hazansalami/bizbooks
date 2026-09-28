@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: Props) {
 
 function PeriodNav({ slug, period, basis }: { slug: string; period: Period; basis?: string }) {
   return (
-    <nav aria-label="Report period" className="no-print -mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+    <nav aria-label="Report period" className="no-print no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 py-1 sm:mx-0 sm:flex-wrap sm:px-0">
       {(Object.entries(PERIODS) as [Period, string][]).map(([key, label]) => (
         <Link key={key} href={`/app/reports/${slug}?period=${key}${basis ? `&basis=${basis}` : ""}`} aria-current={period === key ? "page" : undefined}
           className={cn("inline-flex min-h-10 shrink-0 items-center rounded-full px-4 text-sm font-semibold", period === key ? "bg-ink text-white" : "bg-paper text-ink-soft ring-1 ring-line hover:ring-ink")}>

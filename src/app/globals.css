@@ -120,3 +120,7 @@ body {
 /* Keep brand-colour bands and table headers when printing or saving invoices as PDF. */
 .print-sheet { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .print-sheet tr { break-inside: avoid; }
+
+/* Swipeable chip rows on mobile: keep the swipe, hide the scrollbar. */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

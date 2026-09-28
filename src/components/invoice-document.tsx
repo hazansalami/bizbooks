@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { FullInvoice } from "@/lib/invoices";
-import { amountInWords, balanceDue, naira } from "@/lib/money";
+import { amountInWords, balanceDue, money } from "@/lib/money";
 import { cn, formatDate, initials } from "@/lib/utils";
 import { isPro } from "@/lib/plan";
 import { APP_NAME } from "@/lib/constants";
@@ -28,8 +28,10 @@ function docData(inv: FullInvoice) {
   const color = b.brandColor || "#0E7A55";
   const isQuote = inv.kind === "QUOTE";
   const kindLabel = isQuote ? "Quote" : inv.vatAmount > 0 ? "Tax invoice" : "Invoice";
+  const cur = inv.currency || "NGN";
   return {
-    inv, b, color, isQuote, kindLabel,
+    inv, b, color, isQuote, kindLabel, cur,
+    m: (n: number) => money(n, cur),
     heading: inv.title?.trim() || kindLabel,
     due: balanceDue(inv),
     banks: [...b.bankAccounts].sort((x, y) => Number(y.isDefault) - Number(x.isDefault)),
@@ -45,7 +47,7 @@ function docData(inv: FullInvoice) {
 }
 
 const qty = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
-const money = (n: number) => (n < 0 ? `(${naira(-n)})` : naira(n));
+const signed = (d: Doc, n: number) => (n < 0 ? `(${d.m(-n)})` : d.m(n));
 
 /* ---------- Shared pieces ---------- */
 
@@ -94,7 +96,7 @@ function Meta({ d, withDue = true, className }: { d: Doc; withDue?: boolean; cla
       {d.meta.map(([k, v]) => (
         <div key={k} className="contents"><dt className="text-right font-semibold">{k}:</dt><dd className="num">{v}</dd></div>
       ))}
-      {withDue && !d.isQuote && <><dt className="text-right font-semibold">Amount due:</dt><dd className="num font-bold">{naira(d.due)}</dd></>}
+      {withDue && !d.isQuote && <><dt className="text-right font-semibold">Amount due:</dt><dd className="num font-bold">{d.m(d.due)}</dd></>}
     </dl>
   );
 }
@@ -113,19 +115,19 @@ function Totals({ d, className, highlight = true }: { d: Doc; className?: string
   return (
     <div className={cn("flex flex-col items-end", className)}>
       <dl className="num w-full max-w-xs space-y-1.5 text-sm">
-        <Row label="Subtotal" value={naira(inv.subtotal)} />
-        {inv.discount > 0 && <Row label="Discount" value={`−${naira(inv.discount)}`} />}
-        {inv.vatAmount > 0 && <Row label={`VAT (${inv.vatRate}%)`} value={naira(inv.vatAmount)} />}
-        <div className="flex justify-between border-t border-line pt-2 text-base font-bold"><dt>Total</dt><dd>{naira(inv.total)}</dd></div>
-        {inv.whtRate > 0 && <Row label={`Less WHT (${inv.whtRate}%) deducted by you`} value={`−${naira(inv.whtAmount)}`} />}
-        {inv.amountPaid > 0 && <Row label="Paid so far" value={`−${naira(inv.amountPaid)}`} />}
+        <Row label="Subtotal" value={d.m(inv.subtotal)} />
+        {inv.discount > 0 && <Row label="Discount" value={`−${d.m(inv.discount)}`} />}
+        {inv.vatAmount > 0 && <Row label={`VAT (${inv.vatRate}%)`} value={d.m(inv.vatAmount)} />}
+        <div className="flex justify-between border-t border-line pt-2 text-base font-bold"><dt>Total</dt><dd>{d.m(inv.total)}</dd></div>
+        {inv.whtRate > 0 && <Row label={`Less WHT (${inv.whtRate}%) deducted by you`} value={`−${d.m(inv.whtAmount)}`} />}
+        {inv.amountPaid > 0 && <Row label="Paid so far" value={`−${d.m(inv.amountPaid)}`} />}
         {!isQuote && (
           highlight
-            ? <div className="flex justify-between rounded-lg px-2 py-1.5 font-bold" style={{ background: color, color: textOn(color) }}><dt>Amount due (NGN)</dt><dd>{naira(due)}</dd></div>
-            : <div className="flex justify-between border-t-2 pt-2 text-base font-bold" style={{ borderColor: color }}><dt>Amount due (NGN)</dt><dd>{naira(due)}</dd></div>
+            ? <div className="flex justify-between rounded-lg px-2 py-1.5 font-bold" style={{ background: color, color: textOn(color) }}><dt>Amount due ({d.cur})</dt><dd>{d.m(due)}</dd></div>
+            : <div className="flex justify-between border-t-2 pt-2 text-base font-bold" style={{ borderColor: color }}><dt>Amount due ({d.cur})</dt><dd>{d.m(due)}</dd></div>
         )}
       </dl>
-      <p className="mt-3 max-w-md text-right text-xs italic text-muted">{amountInWords(isQuote ? inv.total : due || inv.total)}</p>
+      <p className="mt-3 max-w-md text-right text-xs italic text-muted">{amountInWords(isQuote ? inv.total : due || inv.total, d.cur)}</p>
     </div>
   );
 }
@@ -201,8 +203,8 @@ function Classic({ d }: { d: Doc }) {
               <tr key={it.id} className="break-inside-avoid border-b border-line align-top">
                 <td className="py-3 pr-4"><ItemText name={it.description} details={it.details} /></td>
                 <td className="num py-3 text-right">{qty(it.quantity)}</td>
-                <td className="num py-3 text-right">{money(it.unitPrice)}</td>
-                <td className="num py-3 text-right font-medium">{money(it.amount)}</td>
+                <td className="num py-3 text-right">{signed(d, it.unitPrice)}</td>
+                <td className="num py-3 text-right font-medium">{signed(d, it.amount)}</td>
               </tr>
             ))}
           </tbody>
@@ -227,8 +229,8 @@ function Contemporary({ d }: { d: Doc }) {
           {inv.summary && <p className="mt-2 text-sm opacity-90">{inv.summary}</p>}
         </div>
         <div className="flex flex-col justify-center p-6 sm:items-center sm:p-8" style={{ background: dark, color: textOn(dark) }}>
-          <p className="text-sm opacity-90">{d.isQuote ? "Quote total (NGN)" : "Amount due (NGN)"}</p>
-          <p className="num mt-1 text-3xl font-semibold">{naira(d.isQuote ? inv.total : d.due)}</p>
+          <p className="text-sm opacity-90">{d.isQuote ? `Quote total (${d.cur})` : `Amount due (${d.cur})`}</p>
+          <p className="num mt-1 text-3xl font-semibold">{d.m(d.isQuote ? inv.total : d.due)}</p>
         </div>
       </header>
       <PaidStamp d={d} className="right-6 top-40" />
@@ -254,8 +256,8 @@ function Contemporary({ d }: { d: Doc }) {
                 <tr key={it.id} className={cn("break-inside-avoid border-b border-line align-top", i % 2 === 0 && "bg-canvas")}>
                   <td className="py-4 pl-5 pr-4 sm:pl-8"><ItemText name={it.description} details={it.details} /></td>
                   <td className="num py-4 text-center">{qty(it.quantity)}</td>
-                  <td className="num py-4 text-right">{money(it.unitPrice)}</td>
-                  <td className="num py-4 pr-5 text-right sm:pr-8">{money(it.amount)}</td>
+                  <td className="num py-4 text-right">{signed(d, it.unitPrice)}</td>
+                  <td className="num py-4 pr-5 text-right sm:pr-8">{signed(d, it.amount)}</td>
                 </tr>
               ))}
             </tbody>
@@ -313,7 +315,7 @@ function Minimal({ d }: { d: Doc }) {
         {!d.isQuote && (
           <div className="sm:text-right">
             <p className="text-xs uppercase tracking-wider text-muted">Amount due</p>
-            <p className="num mt-1 text-3xl font-light" style={{ color }}>{naira(d.due)}</p>
+            <p className="num mt-1 text-3xl font-light" style={{ color }}>{d.m(d.due)}</p>
           </div>
         )}
       </div>
@@ -333,8 +335,8 @@ function Minimal({ d }: { d: Doc }) {
               <tr key={it.id} className="break-inside-avoid border-t border-line align-top">
                 <td className="py-4 pr-6"><ItemText name={it.description} details={it.details} /></td>
                 <td className="num py-4 text-right">{qty(it.quantity)}</td>
-                <td className="num py-4 text-right">{money(it.unitPrice)}</td>
-                <td className="num py-4 text-right">{money(it.amount)}</td>
+                <td className="num py-4 text-right">{signed(d, it.unitPrice)}</td>
+                <td className="num py-4 text-right">{signed(d, it.amount)}</td>
               </tr>
             ))}
           </tbody>
@@ -390,8 +392,8 @@ function Letterhead({ d }: { d: Doc }) {
                 <td className="num border border-line-strong px-2 py-2 text-center">{i + 1}</td>
                 <td className="border border-line-strong px-3 py-2"><ItemText name={it.description} details={it.details} /></td>
                 <td className="num border border-line-strong px-2 py-2 text-right">{qty(it.quantity)}</td>
-                <td className="num border border-line-strong px-2 py-2 text-right">{money(it.unitPrice)}</td>
-                <td className="num border border-line-strong px-2 py-2 text-right">{money(it.amount)}</td>
+                <td className="num border border-line-strong px-2 py-2 text-right">{signed(d, it.unitPrice)}</td>
+                <td className="num border border-line-strong px-2 py-2 text-right">{signed(d, it.amount)}</td>
               </tr>
             ))}
           </tbody>
@@ -429,7 +431,7 @@ function Compact({ d }: { d: Doc }) {
         <div className="text-xs text-muted">{d.fromLines.map((l) => <p key={l}>{l}</p>)}</div>
         <div className="sm:text-right">
           {inv.poNumber && <p className="text-xs text-muted">PO / ref <span className="num text-ink">{inv.poNumber}</span></p>}
-          {!d.isQuote && <><p className="text-xs uppercase tracking-wider text-muted">Amount due</p><p className="num text-xl font-bold">{naira(d.due)}</p></>}
+          {!d.isQuote && <><p className="text-xs uppercase tracking-wider text-muted">Amount due</p><p className="num text-xl font-bold">{d.m(d.due)}</p></>}
         </div>
       </div>
 
@@ -450,8 +452,8 @@ function Compact({ d }: { d: Doc }) {
                 <td className="num px-2 py-1.5 text-muted">{i + 1}</td>
                 <td className="px-2 py-1.5"><ItemText name={it.description} details={it.details} className="[&>p:first-child]:font-medium [&>p+p]:mt-0.5 [&>p+p]:text-xs" /></td>
                 <td className="num px-2 py-1.5 text-right">{qty(it.quantity)}</td>
-                <td className="num px-2 py-1.5 text-right">{money(it.unitPrice)}</td>
-                <td className="num px-2 py-1.5 text-right">{money(it.amount)}</td>
+                <td className="num px-2 py-1.5 text-right">{signed(d, it.unitPrice)}</td>
+                <td className="num px-2 py-1.5 text-right">{signed(d, it.amount)}</td>
               </tr>
             ))}
           </tbody>

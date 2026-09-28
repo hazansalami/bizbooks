@@ -2,23 +2,18 @@ import Link from "next/link";
 import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
-/** Wordmark: an open ledger whose right page is a tick. */
+/** The BizBooks "B" mark on its own. Artwork in /public/brand, made from the brand master files. */
 export function Mark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 32 32" className={cn("size-8", className)} aria-hidden>
-      <rect width="32" height="32" rx="9" fill="#0E7A55" />
-      <path d="M8 10.5c2.6-1.2 5.3-1.2 8 0v12c-2.7-1.2-5.4-1.2-8 0z" fill="#fff" opacity=".9" />
-      <path d="M16 10.5c2.6-1.2 5.3-1.2 8 0v12c-2.7-1.2-5.4-1.2-8 0z" fill="#F2A541" />
-      <path d="m18.2 16.6 1.7 1.7 3-3.4" stroke="#14201B" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/brand/mark.png" alt="" aria-hidden width={32} height={32} className={cn("size-8 shrink-0 object-contain", className)} />;
 }
 
+/** Full logo: mark and wordmark. `light` swaps to white "Biz" for dark backgrounds. */
 export function Logo({ href = "/", className, light }: { href?: string; className?: string; light?: boolean }) {
   return (
-    <Link href={href} className={cn("inline-flex min-h-11 items-center gap-2 font-bold tracking-tight", light ? "text-white" : "text-ink", className)}>
-      <Mark />
-      <span className="text-lg">{APP_NAME}</span>
+    <Link href={href} className={cn("inline-flex min-h-11 shrink-0 items-center", className)} aria-label={`${APP_NAME} home`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={light ? "/brand/logo-light.png" : "/brand/logo.png"} alt={APP_NAME} width={167} height={32} className="h-7 w-auto max-w-none shrink-0 object-contain sm:h-8" />
     </Link>
   );
 }

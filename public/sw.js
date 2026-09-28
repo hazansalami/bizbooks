@@ -4,7 +4,7 @@
   - pages: always from the network, with a friendly offline page when there's no connection
   Signed-in pages are never cached, so a shared phone can't show one owner's books to someone else.
 */
-const VERSION = "bb-v1";
+const VERSION = "bb-v2";
 const OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", (event) => {

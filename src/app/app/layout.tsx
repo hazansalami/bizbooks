@@ -5,6 +5,7 @@ import { Logo } from "@/components/brand";
 import { BottomNav, SideNav } from "@/components/app-nav";
 import { Badge } from "@/components/ui";
 import { requireBusiness } from "@/lib/auth";
+import { adminEmails } from "@/lib/admin";
 import { logout } from "@/app/actions/auth";
 import { isPro } from "@/lib/plan";
 import { initials } from "@/lib/utils";
@@ -32,6 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
           <div className="mt-3 flex items-center justify-between">
             <Link href="/app/settings/billing"><Badge tone={pro ? "brand" : "neutral"}>{pro ? "Pro" : "Free plan"}</Badge></Link>
+            {adminEmails().includes(user.email.toLowerCase()) && <Link href="/admin" className="text-xs font-semibold text-brand hover:underline">Admin</Link>}
             <form action={logout}>
               <button className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-muted hover:text-ink">
                 <LogOut className="size-3.5" aria-hidden /> Log out

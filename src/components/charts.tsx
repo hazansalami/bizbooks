@@ -24,11 +24,12 @@ function useWidth<T extends HTMLElement>() {
   return [ref, w] as const;
 }
 
-function niceTicks(min: number, max: number, count = 4) {
+function niceTicks(min: number, max: number, count = 4, integer = false) {
   if (max === min) max = min + 1;
   const raw = (max - min) / count;
   const mag = 10 ** Math.floor(Math.log10(raw));
-  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) ?? raw;
+  const found = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) ?? raw;
+  const step = integer ? Math.max(1, Math.ceil(found)) : found;
   const lo = Math.floor(min / step) * step;
   const hi = Math.ceil(max / step) * step;
   const ticks: number[] = [];
@@ -48,13 +49,16 @@ function barPath(x: number, y0: number, w: number, y1: number) {
   return `M${x},${y0}V${y1 - r}Q${x},${y1} ${x + r},${y1}H${x + w - r}Q${x + w},${y1} ${x + w},${y1 - r}V${y0}Z`;
 }
 
-export function ColumnChart({ rows, series, height = 240, caption }: { rows: Row[]; series: Series[]; height?: number; caption: string }) {
+/** unit "count" shows plain numbers (sign-ups, invoices) instead of naira. */
+export function ColumnChart({ rows, series, height = 240, caption, unit = "naira" }: { rows: Row[]; series: Series[]; height?: number; caption: string; unit?: "naira" | "count" }) {
+  const short = unit === "count" ? (n: number) => n.toLocaleString("en-NG") : nairaShort;
+  const full = unit === "count" ? (n: number) => n.toLocaleString("en-NG") : (n: number) => naira(n);
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const bars = series.filter((s) => s.kind !== "line");
   const lines = series.filter((s) => s.kind === "line");
   const values = rows.flatMap((r) => series.map((s) => Number(r[s.key]) || 0));
-  const ticks = niceTicks(Math.min(0, ...values), Math.max(0, ...values));
+  const ticks = niceTicks(Math.min(0, ...values), Math.max(0, ...values), 4, unit === "count");
   const pad = { l: 52, r: 8, t: 10, b: 26 };
   const W = Math.max(width, 240);
   const H = height;
@@ -85,7 +89,7 @@ export function ColumnChart({ rows, series, height = 240, caption }: { rows: Row
             {ticks.map((t) => (
               <g key={t}>
                 <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} stroke={t === 0 ? "#cfc8b9" : "#ece8df"} strokeWidth={1} />
-                <text x={pad.l - 8} y={y(t)} dy="0.32em" textAnchor="end" fontSize={11} fill="#5e6a64">{nairaShort(t)}</text>
+                <text x={pad.l - 8} y={y(t)} dy="0.32em" textAnchor="end" fontSize={11} fill="#5e6a64">{short(t)}</text>
               </g>
             ))}
             {hover !== null && <rect x={pad.l + band * hover} y={pad.t} width={band} height={plotH} fill="#0E7A55" opacity={0.06} />}
@@ -118,7 +122,7 @@ export function ColumnChart({ rows, series, height = 240, caption }: { rows: Row
             {series.map((s) => (
               <p key={s.key} className="flex items-center justify-between gap-4">
                 <span className="flex items-center gap-1.5 text-muted"><span className="size-2 rounded-full" style={{ background: s.color }} />{s.label}</span>
-                <span className="num font-semibold">{naira(Number(rows[hover][s.key]) || 0)}</span>
+                <span className="num font-semibold">{full(Number(rows[hover][s.key]) || 0)}</span>
               </p>
             ))}
           </div>
@@ -127,7 +131,7 @@ export function ColumnChart({ rows, series, height = 240, caption }: { rows: Row
       <table className="sr-only">
         <caption>{caption}</caption>
         <thead><tr><th>Month</th>{series.map((s) => <th key={s.key}>{s.label}</th>)}</tr></thead>
-        <tbody>{rows.map((r, i) => <tr key={i}><td>{r.label}</td>{series.map((s) => <td key={s.key}>{naira(Number(r[s.key]) || 0)}</td>)}</tr>)}</tbody>
+        <tbody>{rows.map((r, i) => <tr key={i}><td>{r.label}</td>{series.map((s) => <td key={s.key}>{full(Number(r[s.key]) || 0)}</td>)}</tr>)}</tbody>
       </table>
     </div>
   );

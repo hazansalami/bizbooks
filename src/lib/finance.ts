@@ -40,12 +40,12 @@ export async function cashFlowSeries(businessId: string, n = 12) {
   const from = rows[0].start;
   const to = monthStart(new Date(), 1);
   const [payments, expenses] = await Promise.all([
-    db.payment.findMany({ where: { businessId, paidAt: { gte: from, lt: to } }, select: { amount: true, paidAt: true } }),
+    db.payment.findMany({ where: { businessId, paidAt: { gte: from, lt: to } }, select: { amount: true, paidAt: true, exchangeRate: true } }),
     db.expense.findMany({ where: paidExpensesWhere(businessId, from, to), select: { amount: true, date: true, paidAt: true } }),
   ]);
   const out = rows.map((r) => ({ label: r.label, key: r.key, inflow: 0, outflow: 0, net: 0 }));
   const find = (d: Date) => out.find((r) => r.key === keyOf(d));
-  for (const p of payments) { const r = find(p.paidAt); if (r) r.inflow += p.amount; }
+  for (const p of payments) { const r = find(p.paidAt); if (r) r.inflow += p.amount * p.exchangeRate; }
   for (const e of expenses) { const r = find(cashDate(e)); if (r) r.outflow += e.amount; }
   return out.map((r) => ({ ...r, inflow: round2(r.inflow), outflow: round2(r.outflow), net: round2(r.inflow - r.outflow) }));
 }
@@ -55,12 +55,12 @@ export async function accrualSeries(businessId: string, n = 12) {
   const from = rows[0].start;
   const to = monthStart(new Date(), 1);
   const [invoices, expenses] = await Promise.all([
-    db.invoice.findMany({ where: { businessId, kind: "INVOICE", status: { notIn: ["DRAFT", "VOID"] }, issueDate: { gte: from, lt: to } }, select: { subtotal: true, discount: true, issueDate: true } }),
+    db.invoice.findMany({ where: { businessId, kind: "INVOICE", status: { notIn: ["DRAFT", "VOID"] }, issueDate: { gte: from, lt: to } }, select: { subtotal: true, discount: true, issueDate: true, exchangeRate: true } }),
     db.expense.findMany({ where: { businessId, date: { gte: from, lt: to } }, select: { amount: true, vatAmount: true, date: true } }),
   ]);
   const out = rows.map((r) => ({ label: r.label, key: r.key, income: 0, expenses: 0 }));
   const find = (d: Date) => out.find((r) => r.key === keyOf(d));
-  for (const i of invoices) { const r = find(i.issueDate); if (r) r.income += i.subtotal - i.discount; }
+  for (const i of invoices) { const r = find(i.issueDate); if (r) r.income += (i.subtotal - i.discount) * i.exchangeRate; }
   for (const e of expenses) { const r = find(e.date); if (r) r.expenses += e.amount - e.vatAmount; }
   return out.map((r) => ({ ...r, income: round2(r.income), expenses: round2(r.expenses) }));
 }
@@ -68,10 +68,10 @@ export async function accrualSeries(businessId: string, n = 12) {
 /** Accrual income and expenses for any range, with the expense breakdown by category. */
 export async function accrualTotals(businessId: string, from: Date, to: Date) {
   const [inv, expenses] = await Promise.all([
-    db.invoice.aggregate({ where: { businessId, kind: "INVOICE", status: { notIn: ["DRAFT", "VOID"] }, issueDate: { gte: from, lt: to } }, _sum: { subtotal: true, discount: true } }),
+    db.invoice.findMany({ where: { businessId, kind: "INVOICE", status: { notIn: ["DRAFT", "VOID"] }, issueDate: { gte: from, lt: to } }, select: { subtotal: true, discount: true, exchangeRate: true } }),
     db.expense.findMany({ where: { businessId, date: { gte: from, lt: to } }, select: { amount: true, vatAmount: true, category: true } }),
   ]);
-  const income = round2((inv._sum.subtotal ?? 0) - (inv._sum.discount ?? 0));
+  const income = round2(inv.reduce((s, i) => s + (i.subtotal - i.discount) * i.exchangeRate, 0));
   const byCat = new Map<string, number>();
   for (const e of expenses) byCat.set(e.category, (byCat.get(e.category) ?? 0) + e.amount - e.vatAmount);
   const categories = [...byCat.entries()].map(([name, amount]) => ({ name, amount: round2(amount) })).sort((a, b) => b.amount - a.amount);

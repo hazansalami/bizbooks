@@ -8,10 +8,10 @@ export { monthStart };
 
 export async function moneyInOut(businessId: string, from: Date, to: Date) {
   const [pay, exp] = await Promise.all([
-    db.payment.aggregate({ where: { businessId, paidAt: { gte: from, lt: to } }, _sum: { amount: true } }),
+    db.payment.findMany({ where: { businessId, paidAt: { gte: from, lt: to } }, select: { amount: true, exchangeRate: true } }),
     db.expense.aggregate({ where: paidExpensesWhere(businessId, from, to), _sum: { amount: true } }),
   ]);
-  const moneyIn = round2(pay._sum.amount ?? 0);
+  const moneyIn = round2(pay.reduce((s, p) => s + p.amount * p.exchangeRate, 0));
   const moneyOut = round2(exp._sum.amount ?? 0);
   return { moneyIn, moneyOut, profit: round2(moneyIn - moneyOut) };
 }
@@ -29,8 +29,9 @@ export async function receivables(businessId: string) {
     orderBy: { dueDate: "asc" },
   });
   const now = new Date();
-  const rows = open.map((inv) => ({ inv, due: balanceDue(inv), late: daysBetween(inv.dueDate, now) }));
-  const aging = agingOf(rows.map((r) => ({ amount: r.due, late: r.late })));
+  // due is in the invoice currency; dueNgn converts for totals and aging.
+  const rows = open.map((inv) => ({ inv, due: balanceDue(inv), dueNgn: round2(balanceDue(inv) * inv.exchangeRate), late: daysBetween(inv.dueDate, now) }));
+  const aging = agingOf(rows.map((r) => ({ amount: r.dueNgn, late: r.late })));
   const total = round2(aging.total);
   const overdue = round2(total - aging.comingDue);
   return { rows, total, overdue, aging };

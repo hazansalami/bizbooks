@@ -61,7 +61,7 @@ export async function checkKey(provider: Provider, secretKey: string) {
 }
 
 export type CheckoutInput = {
-  reference: string; amount: number; email: string; customerName: string; phone?: string | null;
+  reference: string; amount: number; currency: string; email: string; customerName: string; phone?: string | null;
   callbackUrl: string; businessName: string; invoiceNumber: string; invoiceId: string;
 };
 
@@ -73,7 +73,7 @@ export async function startCheckout(provider: Provider, secretKey: string, input
         body: {
           email: input.email,
           amount: Math.round(input.amount * 100),
-          currency: "NGN",
+          currency: input.currency,
           reference: input.reference,
           callback_url: input.callbackUrl,
           metadata: {
@@ -94,7 +94,7 @@ export async function startCheckout(provider: Provider, secretKey: string, input
       body: {
         tx_ref: input.reference,
         amount: round2(input.amount),
-        currency: "NGN",
+        currency: input.currency,
         redirect_url: input.callbackUrl,
         customer: { email: input.email, name: input.customerName, phonenumber: input.phone ?? undefined },
         customizations: { title: input.businessName, description: `Invoice ${input.invoiceNumber}` },

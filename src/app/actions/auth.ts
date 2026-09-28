@@ -49,7 +49,7 @@ export async function login(_: FormState, form: FormData): Promise<FormState> {
   }
   await db.user.update({ where: { id: user.id }, data: { lastSeenAt: new Date() } });
   await createSession({ userId: user.id });
-  redirect(next.startsWith("/app") ? next : "/app");
+  redirect(next.startsWith("/app") || next.startsWith("/admin") ? next : "/app");
 }
 
 export async function logout() {

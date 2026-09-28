@@ -146,6 +146,8 @@ model Customer {
   address    String?
   tin        String?
   notes      String?
+  // Currency this client is usually billed in; new invoices start with it.
+  currency   String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -195,6 +197,8 @@ model Invoice {
   issueDate   DateTime  @default(now())
   dueDate     DateTime
   currency    String    @default("NGN")
+  // Naira per 1 unit of the invoice currency (1 for NGN). Reports convert with it, like Wave.
+  exchangeRate Float    @default(1)
   subtotal    Float
   discount    Float     @default(0)
   vatRate     Float     @default(0)
@@ -264,6 +268,8 @@ model Payment {
   method     String
   // Gateway reference. Unique so a webhook and a redirect can't record the same payment twice.
   reference  String?  @unique
+  // Naira per 1 unit of the invoice currency on the day the money arrived. Amount is in the invoice currency.
+  exchangeRate Float  @default(1)
   paidAt     DateTime @default(now())
   note       String?
   createdAt  DateTime @default(now())
@@ -308,6 +314,8 @@ model RecurringSchedule {
   discount     Float     @default(0)
   vatRate      Float     @default(0)
   whtRate      Float     @default(0)
+  currency     String    @default("NGN")
+  exchangeRate Float     @default(1)
   notes        String?
   lastRunAt    DateTime?
   createdAt    DateTime  @default(now())
@@ -546,4 +554,18 @@ model Lead {
   @@index([email])
   @@index([tool, createdAt])
   @@index([nextNurtureAt])
+}
+
+/// Everything done from the /admin dashboard, for accountability. No foreign key, so history survives deletions.
+model AdminAction {
+  id          String   @id @default(cuid())
+  adminEmail  String
+  businessId  String?
+  // GRANT_PRO | REVOKE_PRO | CLEAR_CANCEL | END_PAUSE | ADVISOR_STATUS | NOTE
+  action      String
+  detail      String?
+  createdAt   DateTime @default(now())
+
+  @@index([businessId, createdAt])
+  @@index([createdAt])
 }

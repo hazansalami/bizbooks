@@ -1,3 +1,5 @@
+import { currencyInfo } from "./currency";
+
 /** Round to kobo. Every stored amount passes through here. */
 export function round2(n: number) {
   return Math.round((n + Number.EPSILON) * 100) / 100;
@@ -12,6 +14,17 @@ export function naira(amount: number | null | undefined, opts: { kobo?: boolean 
     minimumFractionDigits: hasKobo ? 2 : 0,
     maximumFractionDigits: hasKobo ? 2 : 0,
   }).format(amount);
+}
+
+/** Any invoice currency. Naira keeps its compact style; others always show 2 decimals, e.g. US$1,250.00. */
+export function money(amount: number | null | undefined, currency = "NGN") {
+  if (amount == null) return "";
+  if (!currency || currency === "NGN") return naira(amount);
+  try {
+    return new Intl.NumberFormat("en-NG", { style: "currency", currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+  } catch {
+    return `${currency} ${amount.toFixed(2)}`;
+  }
 }
 
 /** Short form for dashboards: ₦1.2m, ₦450k. */
@@ -80,7 +93,7 @@ function below1000(n: number): string {
 }
 
 /** "One hundred and fifty thousand naira, fifty kobo" — Nigerian invoices and receipts often show this. */
-export function amountInWords(amount: number) {
+export function amountInWords(amount: number, currency = "NGN") {
   const whole = Math.floor(amount);
   const kobo = Math.round((amount - whole) * 100);
   const scales: [number, string][] = [[1_000_000_000, "billion"], [1_000_000, "million"], [1_000, "thousand"]];
@@ -94,7 +107,8 @@ export function amountInWords(amount: number) {
   }
   if (n) parts.push((parts.length && n < 100 ? "and " : "") + below1000(n));
   let words = parts.length ? parts.join(", ").replace(/, and/g, " and") : "zero";
-  words += " naira";
-  if (kobo) words += `, ${below1000(kobo)} kobo`;
+  const unit = currencyInfo(currency);
+  words += ` ${unit.major}`;
+  if (kobo) words += `, ${below1000(kobo)} ${unit.minor}`;
   return words.charAt(0).toUpperCase() + words.slice(1) + " only";
 }

@@ -1,10 +1,11 @@
+import { toNgn } from "@/lib/currency";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Copy, ExternalLink, Pencil, Trash2, XCircle, ArrowRightLeft } from "lucide-react";
 import { requireBusiness } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { canPayOnline, loadFullInvoice, payUrl, publicInvoiceUrl, whatsappMessage } from "@/lib/invoices";
-import { balanceDue, naira } from "@/lib/money";
+import { balanceDue, money, naira } from "@/lib/money";
 import { INVOICE_STATUS, PAYMENT_METHODS } from "@/lib/constants";
 import { daysBetween, formatDate, timeAgo, whatsappLink } from "@/lib/utils";
 import { convertQuote, deleteDraft, deletePayment, duplicateInvoice, resolveClaim, voidInvoice } from "@/app/actions/invoices";
@@ -59,14 +60,14 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
           </div>
           <div className="text-right">
             <p className="text-sm text-muted">{isQuote ? "Quote total" : inv.status === "PAID" ? "Paid in full" : "Still to pay"}</p>
-            <p className="num text-3xl font-bold tracking-tight">{naira(isQuote || inv.status === "PAID" ? inv.total : due)}</p>
+            <p className="num text-3xl font-bold tracking-tight">{money(isQuote || inv.status === "PAID" ? inv.total : due, inv.currency)}</p>
           </div>
         </div>
       </div>
 
       {claims.map((c) => (
         <Panel key={c.id} className="no-print border-info/40 bg-info-wash/60 p-4">
-          <p className="font-semibold text-info">{c.payerName} says they've sent <span className="num">{naira(c.amount)}</span></p>
+          <p className="font-semibold text-info">{c.payerName} says they've sent <span className="num">{money(c.amount, inv.currency)}</span></p>
           <p className="text-sm text-ink-soft">{timeAgo(c.createdAt)}{c.note ? ` · “${c.note}”` : ""}. Check your bank app, then confirm.</p>
           <form action={resolveClaim} className="mt-3 flex flex-wrap gap-2">
             <input type="hidden" name="claimId" value={c.id} />
@@ -95,7 +96,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
         </div>
       )}
 
-      {open && due > 0 && <div className="no-print"><RecordPayment id={inv.id} balance={due} /></div>}
+      {open && due > 0 && <div className="no-print"><RecordPayment id={inv.id} balance={due} currency={inv.currency} invoiceRate={inv.exchangeRate} /></div>}
 
       <div className="no-print flex flex-wrap gap-2">
         {isQuote && inv.status !== "CONVERTED" && inv.status !== "VOID" && (
@@ -122,7 +123,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
 
       {inv.acceptedAt && (
         <Notice tone="brand" className="no-print" title={`Accepted by ${inv.acceptedBy ?? "the client"} on ${formatDate(inv.acceptedAt)}`}>
-          {deposits.length > 0 && <>Deposit: {deposits.map((d) => <Link key={d.id} href={`/app/invoices/${d.id}`} className="font-semibold underline">{d.number} ({naira(d.total)}, {INVOICE_STATUS[d.status]?.label.toLowerCase()})</Link>)}. It'll be credited when you turn this quote into an invoice.</>}
+          {deposits.length > 0 && <>Deposit: {deposits.map((d) => <Link key={d.id} href={`/app/invoices/${d.id}`} className="font-semibold underline">{d.number} ({money(d.total, inv.currency)}, {INVOICE_STATUS[d.status]?.label.toLowerCase()})</Link>)}. It'll be credited when you turn this quote into an invoice.</>}
         </Notice>
       )}
       {inv.status === "VOID" && <Notice tone="sun" className="no-print">This invoice was cancelled. It stays in your records but can't be paid.</Notice>}
@@ -137,7 +138,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
               {payments.map((p) => (
                 <li key={p.id} className="flex items-center gap-3 py-2.5">
                   <div className="flex-1">
-                    <p className="num font-semibold">{naira(p.amount)}</p>
+                    <p className="num font-semibold">{money(p.amount, inv.currency)}</p>{inv.currency !== "NGN" && <p className="num text-xs text-muted">≈ {naira(toNgn(p.amount, p.exchangeRate))} at ₦{p.exchangeRate.toLocaleString("en-NG")}</p>}
                     <p className="text-sm text-muted">{PAYMENT_METHODS[p.method] ?? p.method} · {formatDate(p.paidAt)}{p.note ? ` · ${p.note}` : ""}</p>
                   </div>
                   {!p.reference && (

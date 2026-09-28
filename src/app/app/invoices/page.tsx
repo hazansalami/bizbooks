@@ -50,7 +50,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
       ) : (
         <>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <nav aria-label="Filter invoices" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+            <nav aria-label="Filter invoices" className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 py-1 sm:mx-0 sm:flex-wrap sm:px-0">
               {FILTERS.map(([key, label]) => (
                 <Link key={key} href={`/app/invoices?filter=${key}${q ? `&q=${encodeURIComponent(q)}` : ""}`} aria-current={filter === key ? "page" : undefined}
                   className={cn("inline-flex min-h-10 shrink-0 items-center rounded-full px-4 text-sm font-semibold", filter === key ? "bg-ink text-white" : "bg-paper text-ink-soft ring-1 ring-line hover:ring-ink")}>
