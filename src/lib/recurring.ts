@@ -23,6 +23,7 @@ export async function runSchedule(scheduleId: string) {
       businessId: s.businessId, customerId: s.customerId, kind: "INVOICE", issueDate,
       dueDate: addDays(issueDate, s.dueInDays), lines: s.items as unknown as LineInput[],
       discount: s.discount, vatRate: s.vatRate, whtRate: s.whtRate, notes: s.notes, recurringId: s.id,
+      currency: s.currency, exchangeRate: s.exchangeRate,
     }, tx);
     const runs = s.runs + 1;
     const next = advance(s.nextRunAt, s.frequency);

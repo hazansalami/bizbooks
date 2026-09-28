@@ -2,7 +2,7 @@ import Link from "next/link";
 import { FileSignature } from "lucide-react";
 import { requireBusiness } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { naira } from "@/lib/money";
+import { money, naira } from "@/lib/money";
 import { INVOICE_STATUS } from "@/lib/constants";
 import { formatDate } from "@/lib/utils";
 import { Badge, ButtonLink, EmptyState, PageHeader, Stat } from "@/components/ui";
@@ -28,8 +28,8 @@ export default async function Quotes() {
       ) : (
         <>
           <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-3">
-            <Stat label="Waiting on clients" value={naira(open.reduce((s, q) => s + q.total, 0))} tone="sun" hint={`${open.length} open quote${open.length === 1 ? "" : "s"}`} />
-            <Stat label="Won" value={naira(won.reduce((s, q) => s + q.total, 0))} tone="brand" hint={decided ? `${Math.round((won.length / decided) * 100)}% win rate` : undefined} />
+            <Stat label="Waiting on clients" value={naira(open.reduce((s, q) => s + q.total * q.exchangeRate, 0))} tone="sun" hint={`${open.length} open quote${open.length === 1 ? "" : "s"}`} />
+            <Stat label="Won" value={naira(won.reduce((s, q) => s + q.total * q.exchangeRate, 0))} tone="brand" hint={decided ? `${Math.round((won.length / decided) * 100)}% win rate` : undefined} />
           </div>
           <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-paper">
             {quotes.map((q) => {
@@ -41,7 +41,7 @@ export default async function Quotes() {
                       <p className="truncate font-semibold">{q.customer.name}</p>
                       <p className="text-sm text-muted">{q.number} · {q.status === "SENT" ? `valid until ${formatDate(q.dueDate)}` : formatDate(q.issueDate)}{q.depositPercent ? ` · ${q.depositPercent}% deposit` : ""}</p>
                     </div>
-                    <div className="text-right"><p className="num font-bold">{naira(q.total)}</p><Badge tone={st.tone}>{q.status === "SENT" ? "Waiting" : st.label}</Badge></div>
+                    <div className="text-right"><p className="num font-bold">{money(q.total, q.currency)}</p><Badge tone={st.tone}>{q.status === "SENT" ? "Waiting" : st.label}</Badge></div>
                   </Link>
                 </li>
               );

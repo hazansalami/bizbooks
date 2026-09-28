@@ -6,7 +6,8 @@ import { saveSchedule } from "@/app/actions/recurring";
 import { SubmitButton, useFormAction, type FormState } from "./form-bits";
 import { Field, Input, inputClass, Notice, Select, Textarea } from "./ui";
 import { FREQUENCIES, TAX } from "@/lib/constants";
-import { computeTotals, naira, parseAmount } from "@/lib/money";
+import { computeTotals, money, parseAmount } from "@/lib/money";
+import { CURRENCIES } from "@/lib/currency";
 import { cn, dateInput } from "@/lib/utils";
 
 type Line = { key: number; description: string; details: string; quantity: string; unitPrice: string };
@@ -14,7 +15,7 @@ let k = 1;
 
 export type RecurringInitial = {
   id: string; customerId: string; title: string; frequency: string; startAt: string; ends: "never" | "after" | "on";
-  maxRuns: string; endAt: string; autoSend: boolean; dueInDays: number; applyVat: boolean; whtRate: number; notes: string;
+  maxRuns: string; endAt: string; autoSend: boolean; dueInDays: number; applyVat: boolean; whtRate: number; notes: string; currency: string; exchangeRate: number;
   items: { description: string; details?: string | null; quantity: number; unitPrice: number }[];
 };
 
@@ -30,6 +31,8 @@ export function RecurringForm({ customers, vatRegistered, vatRate, termsDays, in
   const [frequency, setFrequency] = useState(initial?.frequency ?? "MONTHLY");
   const [applyVat, setApplyVat] = useState(initial?.applyVat ?? vatRegistered);
   const [whtRate, setWhtRate] = useState(String(initial?.whtRate ?? 0));
+  const [currency, setCurrency] = useState(initial?.currency ?? "NGN");
+  const [rate, setRate] = useState(initial && initial.exchangeRate !== 1 ? String(initial.exchangeRate) : "");
   const totals = useMemo(() => computeTotals(lines.map((l) => ({ description: l.description, quantity: parseAmount(l.quantity) || 0, unitPrice: parseAmount(l.unitPrice) || 0 })), 0, applyVat ? vatRate : 0, Number(whtRate)), [lines, applyVat, vatRate, whtRate]);
   const up = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
@@ -37,6 +40,8 @@ export function RecurringForm({ customers, vatRegistered, vatRate, termsDays, in
     <form onSubmit={onSubmit} noValidate className="space-y-5">
       {initial && <input type="hidden" name="id" value={initial.id} />}
       <input type="hidden" name="items" value={JSON.stringify(lines)} />
+      <input type="hidden" name="currency" value={currency} />
+      <input type="hidden" name="exchangeRate" value={currency === "NGN" ? "1" : rate} />
       {state.message && <Notice tone="sun">{state.message}</Notice>}
 
       <section className="space-y-4 rounded-2xl border border-line bg-paper p-4 sm:p-6">
@@ -104,6 +109,20 @@ export function RecurringForm({ customers, vatRegistered, vatRate, termsDays, in
           <Plus className="size-5" aria-hidden /> Add item
         </button>
         <div className="mt-4 grid gap-4 border-t border-line pt-4 sm:grid-cols-2">
+          <label className="text-sm">
+            <span className="mb-1 block text-xs font-semibold text-muted">Currency</span>
+            <select value={currency} onChange={(ev) => setCurrency(ev.target.value)} aria-label="Invoice currency" className={inputClass}>
+              {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code} · {c.name}</option>)}
+            </select>
+          </label>
+          {currency !== "NGN" ? (
+            <label className="text-sm">
+              <span className="mb-1 block text-xs font-semibold text-muted">Exchange rate: ₦ per 1 {currency}</span>
+              <input inputMode="decimal" value={rate} onChange={(ev) => setRate(ev.target.value)} placeholder="e.g. 1,550" className={cn(inputClass, "num")} />
+              <span className="mt-1 block text-xs text-muted">Used for your naira reports. Update it here when rates move; each invoice keeps the rate it was issued with.</span>
+              {e.exchangeRate && <span role="alert" className="mt-1 block font-medium text-danger">{e.exchangeRate}</span>}
+            </label>
+          ) : <span className="hidden sm:block" />}
           {vatRegistered && (
             <label className="flex min-h-11 items-center gap-3"><input type="checkbox" name="applyVat" checked={applyVat} onChange={(ev) => setApplyVat(ev.target.checked)} className="size-5 accent-brand" /> Add VAT ({vatRate}%)</label>
           )}
@@ -116,7 +135,7 @@ export function RecurringForm({ customers, vatRegistered, vatRate, termsDays, in
             <Textarea name="notes" defaultValue={initial?.notes} />
           </Field>
         </div>
-        <p className="num mt-4 text-right text-lg font-bold">Each invoice: {naira(totals.total)}</p>
+        <p className="num mt-4 text-right text-lg font-bold">Each invoice: {money(totals.total, currency)}</p>
       </section>
 
       <label className="flex items-start gap-3 rounded-2xl border border-line bg-paper p-4">

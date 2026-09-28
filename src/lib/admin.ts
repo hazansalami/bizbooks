@@ -71,10 +71,15 @@ export async function loadBusinessRows(now = new Date()) {
       },
     }),
     db.invoice.groupBy({ by: ["businessId"], where: { sentAt: { not: null }, importSource: null }, _count: { _all: true } }),
-    db.invoice.groupBy({ by: ["businessId"], where: { kind: "INVOICE", status: { not: "VOID" }, importSource: null }, _count: { _all: true }, _sum: { total: true } }),
+    db.invoice.findMany({ where: { kind: "INVOICE", status: { not: "VOID" }, importSource: null }, select: { businessId: true, total: true, exchangeRate: true } }),
   ]);
   const sentBy = new Map(sent.map((s) => [s.businessId, s._count._all]));
-  const invBy = new Map(invoices.map((s) => [s.businessId, { count: s._count._all, value: s._sum.total ?? 0 }]));
+  // Invoice values in naira, whatever currency each was issued in.
+  const invBy = new Map<string, { count: number; value: number }>();
+  for (const i of invoices) {
+    const v = invBy.get(i.businessId) ?? { count: 0, value: 0 };
+    invBy.set(i.businessId, { count: v.count + 1, value: v.value + i.total * i.exchangeRate });
+  }
   return businesses.map((b) => {
     const risks = risksFor(b, sentBy.get(b.id) ?? 0, now);
     return {

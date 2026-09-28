@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireBusiness } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { computeTotals, naira, type LineInput } from "@/lib/money";
+import { computeTotals, money, type LineInput } from "@/lib/money";
 import { FREQUENCIES, INVOICE_STATUS } from "@/lib/constants";
 import { dateInput, formatDate } from "@/lib/utils";
 import { sendNextNow, setScheduleStatus } from "@/app/actions/recurring";
@@ -31,7 +31,7 @@ export default async function RecurringPage({ params, searchParams }: { params: 
           initial={{
             id: s.id, customerId: s.customerId, title: s.title, frequency: s.frequency, startAt: dateInput(s.nextRunAt),
             ends: s.maxRuns ? "after" : s.endAt ? "on" : "never", maxRuns: String(s.maxRuns ?? ""), endAt: dateInput(s.endAt),
-            autoSend: s.autoSend, dueInDays: s.dueInDays, applyVat: s.vatRate > 0, whtRate: s.whtRate, notes: s.notes ?? "", items,
+            autoSend: s.autoSend, dueInDays: s.dueInDays, applyVat: s.vatRate > 0, whtRate: s.whtRate, notes: s.notes ?? "", items, currency: s.currency, exchangeRate: s.exchangeRate,
           }}
         />
       </>
@@ -43,7 +43,7 @@ export default async function RecurringPage({ params, searchParams }: { params: 
       <PageHeader
         title={s.title}
         back={{ href: "/app/recurring", label: "Recurring" }}
-        description={<>{s.customer.name} · {FREQUENCIES[s.frequency]} · <span className="num">{naira(t.total)}</span></>}
+        description={<>{s.customer.name} · {FREQUENCIES[s.frequency]} · <span className="num">{money(t.total, s.currency)}</span></>}
         actions={s.status !== "ENDED" ? <Link href={`/app/recurring/${id}?edit=1`} className={buttonClass("secondary")}>Edit</Link> : undefined}
       />
       <Panel className="p-5">

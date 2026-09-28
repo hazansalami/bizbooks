@@ -53,11 +53,12 @@ export async function profitAndLoss(businessId: string, from: Date, to: Date) {
     if (!inv) continue;
     const payable = inv.total - inv.whtAmount;
     if (payable <= 0) continue;
+    // Shares are in the invoice currency; the payment's own rate turns them into naira.
     const share = p.amount / payable;
-    vatCollected += inv.vatAmount * share;
-    whtSuffered += inv.whtAmount * share;
+    vatCollected += inv.vatAmount * share * p.exchangeRate;
+    whtSuffered += inv.whtAmount * share * p.exchangeRate;
   }
-  const moneyIn = round2(payments.reduce((s, p) => s + p.amount, 0));
+  const moneyIn = round2(payments.reduce((s, p) => s + p.amount * p.exchangeRate, 0));
   const moneyOut = round2(expenses.reduce((s, e) => s + e.amount, 0));
   const inputVat = round2(expenses.reduce((s, e) => s + e.vatAmount, 0));
   vatCollected = round2(vatCollected);
@@ -86,7 +87,9 @@ export async function vatSummary(businessId: string, from: Date, to: Date) {
     db.invoice.findMany({ where: { businessId, kind: "INVOICE", status: { notIn: ["DRAFT", "VOID"] }, issueDate: { gte: from, lt: to }, vatAmount: { gt: 0 } }, include: { customer: true }, orderBy: { issueDate: "asc" } }),
     db.expense.findMany({ where: { businessId, date: { gte: from, lt: to }, vatAmount: { gt: 0 } }, orderBy: { date: "asc" } }),
   ]);
-  const output = round2(inv.reduce((s, i) => s + i.vatAmount, 0));
+  // VAT is declared in naira, so foreign-currency invoices convert at their own rate.
+  const invoices = inv.map((i) => ({ ...i, netNgn: round2((i.subtotal - i.discount) * i.exchangeRate), vatNgn: round2(i.vatAmount * i.exchangeRate) }));
+  const output = round2(invoices.reduce((s, i) => s + i.vatNgn, 0));
   const input = round2(exp.reduce((s, e) => s + e.vatAmount, 0));
-  return { invoices: inv, expenses: exp, output, input, net: round2(output - input) };
+  return { invoices, expenses: exp, output, input, net: round2(output - input) };
 }
