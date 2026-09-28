@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import { ButtonLink } from "@/components/ui";
 import { CompareTable } from "@/components/compare-table";
+import { InstallButton } from "@/components/pwa";
 import { APP_NAME } from "@/lib/constants";
 import { SOLUTIONS, SOLUTION_GROUPS } from "./solutions/data";
 import { allArticles, CATEGORIES } from "@/lib/insights";
@@ -199,6 +200,10 @@ export default function Home() {
           <div className="flex-1">
             <h2 className="text-2xl">On your desk and in your pocket.</h2>
             <p className="mt-1 text-ink-soft">Install {APP_NAME} from your browser. Send an invoice, snap a receipt or approve payroll from your phone. No app store download.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <InstallButton />
+            <Link href="/install" className="text-sm font-semibold text-brand-deep hover:underline">Android, iPhone &amp; desktop steps</Link>
           </div>
         </div>
       </section>

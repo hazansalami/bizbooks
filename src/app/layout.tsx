@@ -3,7 +3,7 @@ import { Google_Sans_Flex } from "next/font/google";
 import "./globals.css";
 import { siteUrl } from "@/lib/site-url";
 import { APP_NAME } from "@/lib/constants";
-import { RegisterServiceWorker } from "@/components/pwa";
+import { EARLY_INSTALL_CAPTURE, RegisterServiceWorker } from "@/components/pwa";
 
 // Same family the ECDI portal uses: bold, modern and not on the "AI default" font lists.
 const googleSans = Google_Sans_Flex({
@@ -40,6 +40,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en-NG" className={googleSans.variable}>
+      <head>
+        {/* Chrome fires its install offer once, often before React loads; keep it for the install buttons. */}
+        <script dangerouslySetInnerHTML={{ __html: EARLY_INSTALL_CAPTURE }} />
+      </head>
       <body className="min-h-dvh">
         {children}
         <RegisterServiceWorker />

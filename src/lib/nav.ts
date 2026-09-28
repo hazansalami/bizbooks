@@ -1,14 +1,19 @@
 import {
-  CalendarClock, FileSignature, FileText, Home, Landmark, LifeBuoy, LineChart, Receipt, Repeat, Settings, Users, UsersRound, Wallet,
+  BadgeCent, CalendarClock, FileSignature, FileText, Home, Landmark, LifeBuoy, LineChart, Receipt, Repeat, Settings, ShoppingCart, Users, UsersRound, Wallet,
 } from "lucide-react";
 
 export type Item = { href: string; label: string; icon: typeof Home; exact?: boolean; match?: string[] };
 
-/** Grouped like Wave's own product: overview first, then get paid / spend / pay your team / stay tax-ready. */
-export const NAV_GROUPS: { title?: string; items: Item[] }[] = [
+/**
+ * Grouped like Wave's own product: overview first, then get paid / spend / pay your team / stay tax-ready.
+ * In the sidebar, a group with a title and icon collapses like Wave's "Sales & Payments"; a group with a
+ * single item shows as a plain top-level link.
+ */
+export const NAV_GROUPS: { title?: string; icon?: typeof Home; items: Item[] }[] = [
   { items: [{ href: "/app", label: "Overview", icon: Home, exact: true }] },
   {
     title: "Get paid",
+    icon: BadgeCent,
     items: [
       { href: "/app/invoices", label: "Invoices", icon: FileText, match: ["/app/invoices"] },
       { href: "/app/quotes", label: "Quotes", icon: FileSignature },
@@ -19,6 +24,7 @@ export const NAV_GROUPS: { title?: string; items: Item[] }[] = [
   },
   {
     title: "Spend",
+    icon: ShoppingCart,
     items: [
       { href: "/app/expenses", label: "Expenses", icon: Receipt, exact: true, match: ["/app/expenses/new"] },
       { href: "/app/expenses/recurring", label: "Recurring expenses", icon: Repeat },
@@ -26,7 +32,8 @@ export const NAV_GROUPS: { title?: string; items: Item[] }[] = [
   },
   { title: "Pay your team", items: [{ href: "/app/payroll", label: "Payroll", icon: UsersRound }] },
   {
-    title: "Stay tax-ready",
+    title: "Reports & taxes",
+    icon: LineChart,
     items: [
       { href: "/app/reports", label: "Reports", icon: LineChart },
       { href: "/app/taxes", label: "Taxes", icon: Landmark },

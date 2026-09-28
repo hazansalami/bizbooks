@@ -1,3 +1,4 @@
+import { InstallPrompt } from "@/components/pwa";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
@@ -30,6 +31,7 @@ export default async function Done() {
         <ButtonLink href="/app/invoices/new" size="lg">Create my first invoice</ButtonLink>
         <ButtonLink href="/app" size="lg" variant="secondary">Go to my dashboard</ButtonLink>
       </div>
+      <InstallPrompt className="mx-auto mt-8 max-w-md text-left" />
       <p className="mt-6 text-ink-soft">
         Coming from Wave or Zoho Books? <Link href="/app/import" className="font-semibold text-brand hover:underline">Import your clients, invoices and retainers</Link> in a few minutes.
       </p>

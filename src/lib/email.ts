@@ -5,7 +5,7 @@ import { APP_NAME } from "./constants";
   Transactional email through Resend's HTTP API (no SDK needed). Without RESEND_API_KEY the
   message is logged instead, so local development and the WhatsApp-first flow still work.
 */
-export type Email = { to: string; subject: string; html: string; text: string; replyTo?: string | null; fromName?: string; headers?: Record<string, string> };
+export type Email = { to: string | string[]; cc?: string[]; subject: string; html: string; text: string; replyTo?: string | null; fromName?: string; headers?: Record<string, string> };
 
 export function emailConfigured() {
   return !!process.env.RESEND_API_KEY && !!process.env.EMAIL_FROM;
@@ -13,7 +13,7 @@ export function emailConfigured() {
 
 export async function sendEmail(e: Email): Promise<{ ok: boolean; error?: string }> {
   if (!emailConfigured()) {
-    console.info(`[email:dev] to=${e.to} subject="${e.subject}"\n${e.text}`);
+    console.info(`[email:dev] to=${[e.to].flat().join(", ")}${e.cc?.length ? ` cc=${e.cc.join(", ")}` : ""} subject="${e.subject}"\n${e.text}`);
     return { ok: true };
   }
   const fromAddress = process.env.EMAIL_FROM!;
@@ -22,7 +22,7 @@ export async function sendEmail(e: Email): Promise<{ ok: boolean; error?: string
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from, to: [e.to], subject: e.subject, html: e.html, text: e.text, reply_to: e.replyTo || undefined, headers: e.headers }),
+      body: JSON.stringify({ from, to: [e.to].flat(), cc: e.cc?.length ? e.cc : undefined, subject: e.subject, html: e.html, text: e.text, reply_to: e.replyTo || undefined, headers: e.headers }),
       signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) return { ok: false, error: `Email service returned ${res.status}` };
@@ -52,7 +52,7 @@ ${(opts.after ?? []).map(p).join("")}
 </td></tr></table>
 <p style="font-size:12px;color:#6b746f;margin:16px 0 0">${opts.footer ?? `Sent with ${APP_NAME}`}</p>
 </td></tr></table></body></html>`;
-  const text = [opts.heading, "", ...opts.paragraphs.map(stripTags), ...(opts.button ? ["", `${opts.button.label}: ${opts.button.href}`] : []), "", ...(opts.after ?? []).map(stripTags),
+  const text = [opts.heading, "", ...opts.paragraphs.flatMap((p, i) => (i ? ["", stripTags(p)] : [stripTags(p)])), ...(opts.button ? ["", `${opts.button.label}: ${opts.button.href}`] : []), "", ...(opts.after ?? []).map(stripTags),
     // Keep the footer (with its unsubscribe link) in the plain-text version too.
     ...(opts.footer ? ["", "--", stripTags(opts.footer.replace(/<a href="([^"]+)"[^>]*>([^<]+)<\/a>/g, "$2: $1"))] : [])].join("\n");
   return { html, text };
@@ -64,6 +64,7 @@ function stripTags(s: string) {
     .replace(/<\/td>\s*<td[^>]*>/g, ": ")
     .replace(/<\/tr>/g, "\n")
     .replace(/<[^>]+>/g, "")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
     .replace(/&amp;/g, "&");
 }
 

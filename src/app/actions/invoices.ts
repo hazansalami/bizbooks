@@ -11,6 +11,7 @@ import { advance } from "@/lib/recurring";
 import { isCurrency } from "@/lib/currency";
 import { isPro } from "@/lib/plan";
 import { dateOrNull, str } from "@/lib/utils";
+import { z } from "zod";
 import type { FormState } from "@/components/form-bits";
 
 async function ownInvoice(id: string) {
@@ -157,9 +158,24 @@ export async function saveInvoice(_: FormState, form: FormData): Promise<FormSta
 export async function emailInvoiceAction(_: FormState, form: FormData): Promise<FormState> {
   const { inv } = await ownInvoice(str(form, "id"));
   const full = await loadFullInvoice(inv.id);
-  const r = await emailInvoice(full!, str(form, "kind") === "reminder" ? "reminder" : "send");
+  const kind = str(form, "kind") === "reminder" ? "reminder" : "send";
+  // Recipients typed in the dialog: commas, semicolons or spaces between addresses, at most 5.
+  const to = [...new Set(str(form, "to").split(/[\s,;]+/).map((e) => e.trim().toLowerCase()).filter(Boolean))];
+  const values = { to: str(form, "to"), subject: str(form, "subject"), message: str(form, "message") };
+  if (!to.length) return { errors: { to: "Enter at least one email address." }, values };
+  const bad = to.find((e) => !z.email().safeParse(e).success);
+  if (bad) return { errors: { to: `“${bad}” doesn't look like an email address.` }, values };
+  if (to.length > 5) return { errors: { to: "Send to at most 5 addresses at once." }, values };
+  if (!values.subject.trim()) return { errors: { subject: "Add a subject." }, values };
+  if (!values.message.trim()) return { errors: { message: "Add a message." }, values };
+  if (values.message.length > 5000 || values.subject.length > 200) return { message: "That message is too long. Keep it under 5,000 characters.", values };
+  // Remember the address on the client if they didn't have one.
+  if (!full!.customer.email) await db.customer.update({ where: { id: full!.customerId }, data: { email: to[0] } });
+  const { user } = await requireBusiness();
+  const cc = str(form, "copyMe") === "on" ? [full!.business.email || user.email].filter((e) => !to.includes(e.toLowerCase())) : undefined;
+  const r = await emailInvoice(full!, kind, { to, cc, subject: values.subject, message: values.message });
   revalidatePath(`/app/invoices/${inv.id}`);
-  return r.ok ? { ok: true, message: `Sent to ${full!.customer.email}.` } : { message: r.error };
+  return r.ok ? { ok: true, message: `Sent to ${to.join(", ")}${cc?.length ? `, with a copy to ${cc[0]}` : ""}.` } : { message: r.error, values };
 }
 
 /** Called when the owner shares by WhatsApp or copies the link, so the invoice leaves "Draft". */

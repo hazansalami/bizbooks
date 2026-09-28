@@ -1,3 +1,4 @@
+import { InstallNudge } from "@/components/pwa";
 import Link from "next/link";
 import { Logo } from "@/components/brand";
 import { ButtonLink } from "@/components/ui";
@@ -61,6 +62,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
             <ul className="mt-3 space-y-2 text-sm text-muted">
               <li><Link href="/insights" className="hover:text-ink">Insights</Link></li>
               <li><Link href="/insights/nigeria-tax-calendar-2026" className="hover:text-ink">Tax calendar 2026</Link></li>
+              <li><Link href="/install" className="hover:text-ink">Get the app</Link></li>
               <li><Link href="/tools" className="hover:text-ink">Free calculators</Link></li>
               <li><Link href="/tools/paye-calculator" className="hover:text-ink">PAYE calculator</Link></li>
               <li><Link href="/tools/company-income-tax-calculator" className="hover:text-ink">Company tax calculator</Link></li>
@@ -76,6 +78,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
           <p className="mx-auto mt-2 max-w-2xl px-4">Guides and calculators are general information, not tax, legal or financial advice. Always confirm with a qualified professional.</p>
         </div>
       </footer>
+      <InstallNudge variant="site" />
     </>
   );
 }
