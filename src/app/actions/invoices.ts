@@ -6,7 +6,8 @@ import { db } from "@/lib/db";
 import { requireBusiness } from "@/lib/auth";
 import { applyPayment, createInvoice, emailInvoice, loadFullInvoice, markSent, refreshInvoicePaid } from "@/lib/invoices";
 import { computeTotals, parseAmount, round2, type LineInput } from "@/lib/money";
-import { PAYMENT_METHODS } from "@/lib/constants";
+import { FREE_RECURRING_LIMIT, FREQUENCIES, PAYMENT_METHODS } from "@/lib/constants";
+import { advance } from "@/lib/recurring";
 import { isCurrency } from "@/lib/currency";
 import { isPro } from "@/lib/plan";
 import { dateOrNull, str } from "@/lib/utils";
@@ -75,6 +76,17 @@ export async function saveInvoice(_: FormState, form: FormData): Promise<FormSta
   const depositRaw = Number(str(form, "depositPercent"));
   const depositPercent = kind === "QUOTE" && isPro(business) && depositRaw > 0 && depositRaw < 100 ? Math.round(depositRaw) : null;
 
+  // "Make it recurring" (new invoices only): this invoice is the first; a schedule sends the rest.
+  const repeat = kind === "INVOICE" && !str(form, "id") && str(form, "repeat") === "on";
+  const frequency = str(form, "frequency") in FREQUENCIES ? str(form, "frequency") : "MONTHLY";
+  const maxRunsRaw = parseInt(str(form, "maxRuns"), 10);
+  const maxRuns = Number.isFinite(maxRunsRaw) && maxRunsRaw > 0 ? maxRunsRaw : null;
+  if (repeat && maxRuns === 1) errors.maxRuns = "A recurring invoice needs at least 2 invoices. Choose “Just this once” instead.";
+  if (repeat && !isPro(business)) {
+    const live = await db.recurringSchedule.count({ where: { businessId: business.id, status: { in: ["ACTIVE", "PAUSED"] } } });
+    if (live >= FREE_RECURRING_LIMIT) errors.maxRuns = `The Free plan includes ${FREE_RECURRING_LIMIT} recurring invoices. Upgrade to Pro for unlimited, or choose “Just this once”.`;
+  }
+
   if (Object.keys(errors).length) return { errors, values };
 
   if (customerId === "new" || !customerId) {
@@ -108,7 +120,27 @@ export async function saveInvoice(_: FormState, form: FormData): Promise<FormSta
       }),
     ]);
   } else {
-    invoiceId = (await createInvoice({ businessId: business.id, customerId, kind, issueDate, dueDate: dueDate!, lines, discount, vatRate, whtRate, notes, poNumber, depositPercent, title, summary, currency, exchangeRate })).id;
+    invoiceId = await db.$transaction(async (tx) => {
+      let recurringId: string | null = null;
+      if (repeat) {
+        // First scheduled run: one period after this invoice, and never in the past.
+        let next = advance(issueDate, frequency);
+        while (next <= new Date()) next = advance(next, frequency);
+        const client = await tx.customer.findUnique({ where: { id: customerId }, select: { name: true } });
+        recurringId = (await tx.recurringSchedule.create({
+          data: {
+            businessId: business.id, customerId, title: title || `${client?.name ?? "Client"} · ${FREQUENCIES[frequency].toLowerCase()}`,
+            frequency, nextRunAt: next, maxRuns, runs: 1, lastRunAt: new Date(), autoSend: true,
+            dueInDays: Math.max(0, Math.round((dueDate!.getTime() - issueDate.getTime()) / 86400000)),
+            items: lines.map((l) => ({ description: l.description, details: l.details ?? null, quantity: l.quantity, unitPrice: l.unitPrice })),
+            discount, vatRate, whtRate, notes, currency, exchangeRate,
+          },
+        })).id;
+      }
+      const created = await createInvoice({ businessId: business.id, customerId, kind, issueDate, dueDate: dueDate!, lines, discount, vatRate, whtRate, notes, poNumber, depositPercent, title, summary, currency, exchangeRate, recurringId }, tx);
+      return created.id;
+    });
+    if (repeat) revalidatePath("/app/recurring");
   }
 
   // Remember new line items so they autocomplete next time.

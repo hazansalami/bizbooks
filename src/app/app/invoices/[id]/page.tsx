@@ -56,6 +56,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
             <p className="mt-1 text-muted">
               <Link href={`/app/customers/${inv.customerId}`} className="font-semibold text-ink hover:underline">{inv.customer.name}</Link>
               {" · "}{isQuote ? `valid until ${formatDate(inv.dueDate)}` : `due ${formatDate(inv.dueDate)}`}
+              {inv.recurringId && <>{" · "}<Link href={`/app/recurring/${inv.recurringId}`} className="font-semibold text-brand hover:underline">Recurring</Link></>}
             </p>
           </div>
           <div className="text-right">

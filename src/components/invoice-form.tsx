@@ -7,7 +7,7 @@ import { SubmitButton, useFormAction, type FormState } from "./form-bits";
 import { Field, Input, inputClass, Notice, Select, Textarea } from "./ui";
 import { computeTotals, money, naira, parseAmount } from "@/lib/money";
 import { CURRENCIES } from "@/lib/currency";
-import { TAX } from "@/lib/constants";
+import { FREQUENCIES, TAX } from "@/lib/constants";
 import { addDays, cn, dateInput } from "@/lib/utils";
 
 type Line = { key: number; description: string; details: string; quantity: string; unitPrice: string };
@@ -23,6 +23,8 @@ export type InvoiceFormProps = {
   pro: boolean;
   /** Last rate used per currency, to prefill the exchange rate. */
   lastRates: Record<string, number>;
+  /** How many more recurring invoices this plan allows; null means unlimited. */
+  recurringLeft?: number | null;
   initial?: {
     id: string; customerId: string; issueDate: string; dueDate: string; discount: number; vatRate: number; whtRate: number;
     notes: string; items: { description: string; details: string | null; quantity: number; unitPrice: number }[]; poNumber: string; depositPercent: number | null;
@@ -56,6 +58,9 @@ export function InvoiceForm(p: InvoiceFormProps) {
     if (c !== "NGN") setRate((r) => (r && currency === c ? r : String(p.lastRates[c] ?? "")));
   };
   const fmt = (n: number) => money(n, currency);
+  const [repeat, setRepeat] = useState(false);
+  const [frequency, setFrequency] = useState("MONTHLY");
+  const canRepeat = p.recurringLeft == null || p.recurringLeft > 0;
   const [applyVat, setApplyVat] = useState(p.initial ? p.initial.vatRate > 0 : p.vatRegistered);
   const [discount, setDiscount] = useState(p.initial?.discount ? String(p.initial.discount) : "");
   const [whtRate, setWhtRate] = useState(String(p.initial?.whtRate ?? 0));
@@ -296,6 +301,41 @@ export function InvoiceForm(p: InvoiceFormProps) {
               ))}
             </div>
             {!p.pro && <p className="mt-2 text-sm text-muted">Deposits are a Pro feature. Clients can still accept the quote online.</p>}
+          </fieldset>
+        )}
+        {!isQuote && !p.initial && (
+          <fieldset className="mt-5 border-t border-line pt-5">
+            <legend className="sr-only">Is this a one-off or a recurring invoice?</legend>
+            <p className="text-sm font-semibold" aria-hidden>How often do you bill this?</p>
+            <input type="hidden" name="repeat" value={repeat && canRepeat ? "on" : ""} />
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {([[false, "Just this once", "A single invoice."], [true, "Make it recurring", "Retainers, subscriptions, hosting renewals."]] as const).map(([v, t, d]) => (
+                <label key={t} className={cn("flex cursor-pointer gap-3 rounded-xl border p-3", repeat === v ? "border-brand ring-2 ring-brand/30" : "border-line-strong", v && !canRepeat && "cursor-not-allowed opacity-60")}>
+                  <input type="radio" name="repeatChoice" checked={repeat === v} disabled={v && !canRepeat} onChange={() => setRepeat(v)} className="mt-1 size-4 accent-brand" />
+                  <span><span className="block font-semibold">{t}</span><span className="text-sm text-muted">{d}</span></span>
+                </label>
+              ))}
+            </div>
+            {!canRepeat && (
+              <p className="mt-2 text-sm text-muted">You&apos;re using all the recurring invoices on the Free plan. <a href="/app/settings/billing" className="font-semibold text-brand underline">Upgrade to Pro</a> for unlimited.</p>
+            )}
+            {repeat && canRepeat && (
+              <div className="mt-3 grid gap-4 rounded-xl bg-canvas p-4 sm:grid-cols-2">
+                <Field label="Repeat" name="frequency" required>
+                  <Select name="frequency" value={frequency} onChange={(ev) => setFrequency(ev.target.value)}>
+                    {Object.entries(FREQUENCIES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Stop after" name="maxRuns" hint="Including this one. Leave empty to keep going." error={e.maxRuns}>
+                  <Input name="maxRuns" inputMode="numeric" placeholder="e.g. 12 invoices" className="num" defaultValue={state.values?.maxRuns} error={e.maxRuns} />
+                </Field>
+                <p className="text-sm text-ink-soft sm:col-span-2">
+                  This invoice is the first. The next goes out automatically{" "}
+                  <strong>{frequency === "WEEKLY" ? "a week" : frequency === "QUARTERLY" ? "3 months" : frequency === "YEARLY" ? "a year" : "a month"} after the invoice date</strong>,
+                  with the same items and payment terms, and is emailed to the client. You can change or pause it any time under Recurring invoices.
+                </p>
+              </div>
+            )}
           </fieldset>
         )}
       </section>

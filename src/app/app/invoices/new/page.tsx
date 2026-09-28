@@ -1,3 +1,4 @@
+import { FREE_RECURRING_LIMIT } from "@/lib/constants";
 import { requireBusiness } from "@/lib/auth";
 import { isPro } from "@/lib/plan";
 import { db } from "@/lib/db";
@@ -27,6 +28,7 @@ export default async function NewInvoice({ searchParams }: { searchParams: Promi
         termsDays={business.paymentTermsDays}
         pro={isPro(business)}
         lastRates={await lastRates(business.id)}
+        recurringLeft={isPro(business) ? null : Math.max(0, FREE_RECURRING_LIMIT - (await db.recurringSchedule.count({ where: { businessId: business.id, status: { in: ["ACTIVE", "PAUSED"] } } })))}
         preselectCustomer={customers.some((c) => c.id === customer) ? customer : undefined}
       />
     </>
