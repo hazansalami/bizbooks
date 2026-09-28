@@ -20,7 +20,7 @@ export default async function Customers({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <PageHeader title="Clients" actions={<ButtonLink href="/app/customers/new">Add client</ButtonLink>} />
+      <PageHeader title="Clients" actions={<><ButtonLink href="/app/import" variant="secondary">Import</ButtonLink><ButtonLink href="/app/customers/new">Add client</ButtonLink></>} />
       {total === 0 ? (
         <EmptyState icon={<Users className="size-6" aria-hidden />} title="No clients yet" body="Add the companies you bill. You can also add them while creating an invoice." action={<ButtonLink href="/app/customers/new" size="lg">Add my first client</ButtonLink>} />
       ) : (

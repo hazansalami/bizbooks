@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   applicationName: APP_NAME,
   title: { default: `${APP_NAME}: Accounting, invoicing and payroll for Nigerian companies`, template: `%s | ${APP_NAME}` },
   description: DESCRIPTION,
-  keywords: ["accounting software Nigeria", "invoicing software Nigeria", "payroll software Nigeria", "PAYE calculator 2026", "Paystack invoice", "VAT Nigeria", "Wave alternative Nigeria", "agency accounting software"],
+  keywords: ["accounting software Nigeria", "invoicing software Nigeria", "payroll software Nigeria", "PAYE calculator 2026", "Paystack invoice", "VAT Nigeria", "Wave alternative Nigeria", "Zoho Books alternative Nigeria", "Zoho Books vs Wave", "agency accounting software"],
   alternates: { canonical: "/" },
   openGraph: { type: "website", siteName: APP_NAME, locale: "en_NG", url: "/", title: `${APP_NAME}: Your company's finances, clear at a glance`, description: DESCRIPTION },
   twitter: { card: "summary_large_image", title: `${APP_NAME}: Your company's finances, clear at a glance`, description: DESCRIPTION },

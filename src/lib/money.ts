@@ -37,7 +37,8 @@ export function parseAmount(v: unknown) {
   return Number(cleaned);
 }
 
-export type LineInput = { description: string; quantity: number; unitPrice: number };
+/** description is the item name; details is the optional longer description under it. */
+export type LineInput = { description: string; details?: string | null; quantity: number; unitPrice: number };
 
 export type InvoiceTotals = {
   subtotal: number; discount: number; taxable: number; vatAmount: number; whtAmount: number; total: number; amountDue: number;

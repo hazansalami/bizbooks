@@ -140,13 +140,14 @@ function copyFor(step: number, track: Track, tool: ToolMeta, inputs: string): Co
   };
 
   if (step === 5) return {
-    subject: "We built BizBooks for the gap Wave left in Nigeria",
+    subject: "What Wave and Zoho Books leave out in Nigeria",
     preview: "Invoices, payroll and tax deadlines in one place, with payments going straight to your account.",
     heading: "Your company's finances, in one clear view",
     paragraphs: [
-      "Quick background: Wave stopped sending invoices and reminders for businesses outside the US and Canada, and never supported Nigerian payment gateways or payroll. We built BizBooks for Nigerian companies that need all of that:",
+      "Quick background: Wave stopped sending invoices and reminders for businesses outside the US and Canada, and Zoho Books has no Nigerian payroll. We built BizBooks for Nigerian companies that bill clients and pay a team:",
       li(["Invoices with VAT, WHT, PO numbers and a secure \"Pay now\" link through <strong>your own</strong> Paystack or Flutterwave", "Automatic payment reminders", "Payroll with 2026 PAYE, pension, payslips and a bank upload file", "A tax calendar with every VAT, PAYE, WHT and pension deadline and the amount to set aside", "A dashboard with cash flow, profit and who owes you"]),
       track === "PAYROLL" ? "Payroll for up to 3 people is free." : track === "TAX" ? "The tax calendar and reports are free." : "Invoicing and online payments are free.",
+      "Already on Wave or Zoho Books? Import your clients, invoices and retainers from a CSV export in a few minutes.",
     ],
     button: { label: "Start free, no card needed", href: link("/signup", step) },
     after: [`Your money never passes through us. <a href="${link("/", step)}">See how it works</a>.`],

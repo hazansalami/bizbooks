@@ -65,6 +65,8 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
               <li><Link href="/tools/paye-calculator" className="hover:text-ink">PAYE calculator</Link></li>
               <li><Link href="/tools/company-income-tax-calculator" className="hover:text-ink">Company tax calculator</Link></li>
               <li><Link href="/insights/business-finance-glossary-nigeria" className="hover:text-ink">Glossary</Link></li>
+              <li><Link href="/compare/zoho-books" className="hover:text-ink">BizBooks vs Zoho Books</Link></li>
+              <li><Link href="/compare/wave" className="hover:text-ink">BizBooks vs Wave</Link></li>
             </ul>
           </div>
         </div>

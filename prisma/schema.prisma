@@ -61,6 +61,8 @@ model Business {
   nextQuoteNo      Int     @default(1)
   paymentTermsDays Int     @default(30)
   invoiceFooter    String?
+  // Invoice look: classic | contemporary | minimal | letterhead | compact
+  invoiceTemplate  String  @default("classic")
   autoReminders    Boolean @default(true)
 
   // Onboarding wizard: the last completed step, and when the owner finished or skipped it.
@@ -177,6 +179,11 @@ model Invoice {
   number      String
   // The client's purchase order or reference. Corporate clients often won't pay without it.
   poNumber    String?
+  // Optional heading and one-line summary shown at the top, e.g. "Website redesign & renewal".
+  title       String?
+  summary     String?
+  // WAVE | ZOHO when brought in by the importer. Imported invoices never trigger automatic reminders.
+  importSource String?
   // Quotes: share of the quote the client pays up front when they accept it online.
   depositPercent Int?
   acceptedAt  DateTime?
@@ -224,7 +231,10 @@ model InvoiceItem {
   id          String  @id @default(cuid())
   invoiceId   String
   invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  // The item or service name, shown in bold.
   description String
+  // Longer description under the name: scope, deliverables, period covered.
+  details     String?
   quantity    Float
   unitPrice   Float
   amount      Float

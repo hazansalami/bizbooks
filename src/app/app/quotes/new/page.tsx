@@ -11,7 +11,7 @@ export default async function NewQuote({ searchParams }: { searchParams: Promise
   const { customer } = await searchParams;
   const [customers, items] = await Promise.all([
     db.customer.findMany({ where: { businessId: business.id }, orderBy: { name: "asc" }, select: { id: true, name: true, phone: true } }),
-    db.item.findMany({ where: { businessId: business.id }, orderBy: { name: "asc" }, select: { name: true, unitPrice: true } }),
+    db.item.findMany({ where: { businessId: business.id }, orderBy: { name: "asc" }, select: { name: true, description: true, unitPrice: true } }),
   ]);
   return (
     <>

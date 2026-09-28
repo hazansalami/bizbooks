@@ -18,6 +18,12 @@
 - Payroll for staff (PAYE, 8%/10% pension, NHF, rent relief) and contractors (withholding tax)
 - Payslips, bank bulk-transfer schedule (CSV), and automatic salary expense entries
 
+## Switching from Wave or Zoho Books
+- Import clients, invoices (with line items, VAT and balances), services and recurring invoices from Wave or Zoho Books CSV exports; retainers are detected from invoice history
+- 5 invoice styles (Classic, Contemporary, Minimal, Letterhead, Compact), item descriptions and invoice titles
+- [BizBooks vs Zoho Books](/compare/zoho-books): BizBooks includes Nigerian payroll (Zoho Payroll isn't available in Nigeria) and built-in Paystack/Flutterwave; Zoho Books offers NRS e-invoicing, inventory and projects
+- [BizBooks vs Wave](/compare/wave): Wave no longer sends invoices outside the US and Canada
+
 ## Pricing
 - Free: invoicing, payments, expenses, dashboard, tax tracking, payroll for up to 3 people
 - Pro: unlimited recurring items, full payroll with emailed payslips, quote deposits, reminders, branding, CSV exports
@@ -61,6 +67,7 @@
 - [CAC annual returns](/insights/cac-annual-returns-guide)
 - [Business name vs limited company](/insights/business-name-vs-limited-company-nigeria)
 - [Outsourced bookkeeping](/insights/outsourced-bookkeeping-nigeria)
+- [Move your books from Wave or Zoho Books](/insights/move-from-wave-or-zoho-books)
 
 ## Free calculators (/tools)
 - [PAYE calculator 2026](/tools/paye-calculator): salary to PAYE, pension, take-home
@@ -74,6 +81,7 @@
 - [Home](/)
 - [Pricing](/pricing) · machine-readable: [/pricing.md](/pricing.md)
 - [Advisors](/advisors)
+- [Compare: Zoho Books](/compare/zoho-books) · [Compare: Wave](/compare/wave)
 - [Insights](/insights)
 - [Solutions: Bookkeeping & reports](/solutions/accounting)
 - [Solutions: Payroll](/solutions/payroll)

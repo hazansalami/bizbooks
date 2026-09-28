@@ -20,7 +20,7 @@ Rules:     One sequence per address. Later calculator uses and existing customer
 | 2 | 2 | Expand on the topic (track-specific) | PAYROLL: "3 PAYE mistakes employers are making in 2026" · TAX: "The 3 tax deadlines that catch companies out" · INVOICING: "Why your client paid less than your invoice" | PAYE guide · Tax calendar · WHT guide |
 | 3 | 5 | Problem deep-dive (track-specific) | PAYROLL: "What a new hire really costs" · TAX: "Is your company still 'small' for tax?" · INVOICING: "The reminder schedule that gets invoices paid" | Employer cost calculator · Small company guide · Collections playbook |
 | 4 | 8 | Framework (shared) | A 2-hour month-end routine for your books | Month-end checklist |
-| 5 | 12 | Differentiation (shared) | We built BizBooks for the gap Wave left in Nigeria | Start free (/signup) |
+| 5 | 12 | Differentiation (shared) | What Wave and Zoho Books leave out in Nigeria | Start free (/signup) |
 | 6 | 16 | Direct offer + objection (shared) | Rather hand this to someone else? | Book a free consultation (/advisors), or start free |
 
 All links carry `utm_source=nurture&utm_medium=email&utm_campaign=calc_<step>`.

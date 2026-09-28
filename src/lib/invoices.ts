@@ -35,6 +35,7 @@ export type NewInvoice = {
   lines: LineInput[]; discount: number; vatRate: number; whtRate: number; notes: string | null;
   recurringId?: string | null; convertedFromId?: string | null;
   poNumber?: string | null; depositPercent?: number | null; depositForId?: string | null;
+  title?: string | null; summary?: string | null;
 };
 
 export async function createInvoice(input: NewInvoice, tx?: Tx) {
@@ -61,11 +62,13 @@ export async function createInvoice(input: NewInvoice, tx?: Tx) {
         recurringId: input.recurringId ?? null,
         convertedFromId: input.convertedFromId ?? null,
         poNumber: input.poNumber ?? null,
+        title: input.title ?? null,
+        summary: input.summary ?? null,
         depositPercent: input.kind === "QUOTE" ? input.depositPercent ?? null : null,
         depositForId: input.depositForId ?? null,
         items: {
           create: input.lines.map((l, i) => ({
-            description: l.description, quantity: l.quantity, unitPrice: round2(l.unitPrice),
+            description: l.description, details: l.details || null, quantity: l.quantity, unitPrice: round2(l.unitPrice),
             amount: round2(l.quantity * l.unitPrice), position: i,
           })),
         },

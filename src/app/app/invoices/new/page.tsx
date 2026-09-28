@@ -12,7 +12,7 @@ export default async function NewInvoice({ searchParams }: { searchParams: Promi
   const isQuote = kind === "QUOTE";
   const [customers, items] = await Promise.all([
     db.customer.findMany({ where: { businessId: business.id }, orderBy: { name: "asc" }, select: { id: true, name: true, phone: true } }),
-    db.item.findMany({ where: { businessId: business.id }, orderBy: { name: "asc" }, select: { name: true, unitPrice: true } }),
+    db.item.findMany({ where: { businessId: business.id }, orderBy: { name: "asc" }, select: { name: true, description: true, unitPrice: true } }),
   ]);
   return (
     <>

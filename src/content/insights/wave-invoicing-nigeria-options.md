@@ -5,7 +5,7 @@ category: running
 summary: Wave has told users outside the US and Canada that they can no longer send invoices or reminders automatically through Wave. Its payments and payroll were already limited to the US and Canada. Nigerian companies can keep using Wave for bookkeeping and send invoices manually, move to another platform, or switch to a Nigeria-first tool that supports local gateways, VAT, WHT and PAYE.
 keywords: wave invoicing nigeria, wave alternative nigeria, wave app not sending invoices, waveapps nigeria, accounting software nigeria
 published: 2026-09-27
-updated: 2026-09-27
+updated: 2026-09-28
 ---
 
 Wave has been a favourite of Nigerian freelancers and agencies for years: free, simple and good-looking. In 2026 many Nigerian users logged in to find this notice: *users outside the US and Canada are no longer able to automatically send invoices or reminders via Wave.* Here's what it means and how to decide what to do.
@@ -29,7 +29,7 @@ You can still log in to your books, record transactions and view reports, and yo
 | Option | Good for | Watch out for |
 |---|---|---|
 | **Stay on Wave and send invoices manually** | Low volume, bookkeeping mostly | No reminders, no online payments, extra admin for every invoice |
-| **Move to a global accounting platform** (such as Wave's partner offer) | Companies with accountants used to that tool | Check support for Nigerian VAT and WHT on invoices, Nigerian payment gateways and PAYE before committing |
+| **Zoho Books** (Wave's partner offer, now with a Nigeria edition) | Companies that need inventory, projects or NRS e-invoicing today | No payroll in Nigeria (Zoho Payroll isn't offered here); Paystack through an add-on app |
 | **Spreadsheets** | Very early-stage businesses | No reminders, error-prone, painful at tax time |
 | **A Nigeria-first platform** | Companies that want invoicing, local payments, payroll and tax in one place | Check it can export your data if you ever leave |
 
@@ -47,14 +47,17 @@ Make a shortlist against the things that matter in Nigeria:
 
 ## How do I move my data?
 
-1. Export **customers**, **invoices** and **transactions** from Wave as CSV (Wave's reports and data export tools).
-2. Note which **invoices are still unpaid**. Recreate those first so you can keep collecting.
-3. Start the new tool from a clean date, such as the first day of the next month, and keep the old data for reference.
-4. Tell clients if your **payment details or invoice format** change.
+1. In Wave, run **Reports → Account Transactions** for **All time** on an **Accrual** basis and export it as CSV. It has every invoice's client, number, date, services and VAT. **Settings → Data Export** gives you the full accounting and sales files too.
+2. Export your **customer list** for emails and phone numbers.
+3. Import the files into your new tool, or recreate your **unpaid invoices** first so you can keep collecting.
+4. Set up your **retainers** as recurring invoices so the next month goes out on time.
+5. Tell clients if your **payment details or invoice format** change.
+
+In BizBooks, **Settings → Import** reads Wave's CSV files directly, rebuilds each invoice with its services and VAT, and spots monthly retainers for you. [Step-by-step guide](/insights/move-from-wave-or-zoho-books).
 
 ## Where BizBooks fits
 
-BizBooks was built for exactly this gap: Wave's simple approach to books and invoicing, plus what Nigerian companies need. It sends invoices and **automatic reminders**, takes payments through **your own Paystack or Flutterwave**, runs **payroll with 2026 PAYE**, and tracks **VAT, WHT, PAYE and pension deadlines**. You can start free. [See how it compares](/#how-it-works).
+BizBooks was built for exactly this gap: Wave's simple approach to books and invoicing, plus what Nigerian companies need. It sends invoices and **automatic reminders**, takes payments through **your own Paystack or Flutterwave**, runs **payroll with 2026 PAYE**, and tracks **VAT, WHT, PAYE and pension deadlines**. You can start free. [BizBooks vs Wave](/compare/wave) · [BizBooks vs Zoho Books](/compare/zoho-books).
 
 ## Frequently asked questions
 
@@ -72,8 +75,13 @@ No. Wave Payroll is for US and Canadian businesses.
 
 ### How do I export my data from Wave?
 
-Use Wave's export tools to download customers, invoices and transactions as CSV files, then import or recreate them in your new tool, starting with unpaid invoices.
+Run the Account Transactions report for all time on an accrual basis and export it as CSV, or use Settings → Data Export. Then import the files into your new tool, starting with unpaid invoices.
+
+### Is Zoho Books a good Wave alternative in Nigeria?
+
+Zoho Books now has a Nigeria edition with VAT, WHT and e-invoicing on higher plans. It doesn't offer payroll in Nigeria, and Paystack works through an add-on. If you run a payroll or want Paystack and Flutterwave built in, compare it with a Nigeria-first tool.
 
 ## Sources
 
 - Wave in-app notice to users outside the US and Canada (2026), and [Wave pricing](https://www.waveapps.com/pricing) (Wave Payments and Payroll availability).
+- [Zoho Books Nigeria pricing](https://www.zoho.com/en-ng/books/pricing/) and [Zoho: payroll in Zoho Books](https://www.zoho.com/books/kb/general/payroll.html).

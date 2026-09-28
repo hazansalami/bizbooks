@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { requireBusiness } from "@/lib/auth";
 import { addBankAccount, NUBAN, saveGateway } from "@/lib/business";
 import { str } from "@/lib/utils";
+import { templateId } from "@/lib/invoice-templates";
 import type { FormState } from "@/components/form-bits";
 
 export async function saveProfile(_: FormState, form: FormData): Promise<FormState> {
@@ -98,4 +99,10 @@ export async function gatewayAction(form: FormData) {
   if (op === "remove") await db.gateway.delete({ where: { id: g.id } });
   else await db.gateway.update({ where: { id: g.id }, data: { enabled: op === "enable" } });
   revalidatePath("/app/settings/payments");
+}
+
+export async function saveInvoiceTemplate(form: FormData) {
+  const { business } = await requireBusiness();
+  await db.business.update({ where: { id: business.id }, data: { invoiceTemplate: templateId(str(form, "template")) } });
+  revalidatePath("/app/settings/invoice-style");
 }

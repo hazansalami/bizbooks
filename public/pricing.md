@@ -10,6 +10,10 @@ Prices in Nigerian naira (NGN). No automatic charges: Pro is paid monthly or yea
 - Price: ₦12,500/month, or ₦125,000/year
 - Includes everything in Free, plus: unlimited recurring invoices and expenses; payroll for the whole team with emailed payslips; quotes with deposits; automatic payment reminders; custom branding; CSV exports for accountants
 
+## Compared with alternatives (September 2026)
+- Zoho Books (Nigeria edition): paid plans from ₦4,320/month; no payroll in Nigeria; Paystack via add-on app. See /compare/zoho-books
+- Wave: free, but invoices and reminders can't be sent from Wave outside the US and Canada. See /compare/wave
+
 ## Payment processing
 - BizBooks adds no fees. Online payments use the customer's own Paystack or Flutterwave account at their standard rates.
 

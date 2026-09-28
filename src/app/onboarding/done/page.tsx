@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { PartyPopper } from "lucide-react";
@@ -29,6 +30,9 @@ export default async function Done() {
         <ButtonLink href="/app/invoices/new" size="lg">Create my first invoice</ButtonLink>
         <ButtonLink href="/app" size="lg" variant="secondary">Go to my dashboard</ButtonLink>
       </div>
+      <p className="mt-6 text-ink-soft">
+        Coming from Wave or Zoho Books? <Link href="/app/import" className="font-semibold text-brand hover:underline">Import your clients, invoices and retainers</Link> in a few minutes.
+      </p>
       {(!banks || !gateways) && (
         <p className="mt-6 text-sm text-muted">
           Skipped something? No problem. Your dashboard has a checklist to finish it whenever you're ready.

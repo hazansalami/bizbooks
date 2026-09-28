@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { Check } from "lucide-react";
 import { ButtonLink } from "@/components/ui";
@@ -56,6 +57,18 @@ export default function Pricing() {
           {APP_NAME} adds nothing on top. Online payments go through your company's own Paystack or Flutterwave account at
           their standard rates and settle into your bank as usual. Bank transfers straight to your account cost nothing extra.
           Payroll is paid from your own bank, so there are no per-payslip charges either.
+        </p>
+      </div>
+
+      <div className="mx-auto mt-6 max-w-3xl rounded-2xl border border-line bg-paper p-6">
+        <h2 className="text-lg">How does this compare with Zoho Books or Wave?</h2>
+        <p className="mt-1 text-ink-soft">
+          Zoho Books&apos; Nigeria plans start lower, but Zoho Payroll isn&apos;t available in Nigeria, so you&apos;d pay for payroll
+          separately. Wave is free but no longer sends invoices outside the US and Canada. {APP_NAME} Pro includes invoicing,
+          reminders, Paystack and Flutterwave payments and payroll for your whole team.{" "}
+          <Link href="/compare/zoho-books" className="font-semibold text-brand hover:underline">Compare with Zoho Books</Link>
+          {" · "}
+          <Link href="/compare/wave" className="font-semibold text-brand hover:underline">Compare with Wave</Link>
         </p>
       </div>
     </section>

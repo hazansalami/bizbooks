@@ -27,7 +27,7 @@ function parseLines(raw: string): { lines: LineInput[]; error?: string } {
   }
   if (!Array.isArray(data)) return { lines: [], error: "Add at least one item." };
   const lines = data
-    .map((l) => ({ description: String(l?.description ?? "").trim(), quantity: parseAmount(String(l?.quantity ?? "")), unitPrice: parseAmount(String(l?.unitPrice ?? "")) }))
+    .map((l) => ({ description: String(l?.description ?? "").trim(), details: String(l?.details ?? "").trim().slice(0, 4000) || null, quantity: parseAmount(String(l?.quantity ?? "")), unitPrice: parseAmount(String(l?.unitPrice ?? "")) }))
     .filter((l) => l.description || l.unitPrice);
   if (!lines.length) return { lines, error: "Add at least one item with a price." };
   for (const l of lines) {
@@ -80,6 +80,8 @@ export async function saveInvoice(_: FormState, form: FormData): Promise<FormSta
   }
 
   const notes = str(form, "notes") || null;
+  const title = str(form, "title").slice(0, 120) || null;
+  const summary = str(form, "summary").slice(0, 300) || null;
   const id = str(form, "id");
   let invoiceId = id;
   if (id) {
@@ -93,19 +95,20 @@ export async function saveInvoice(_: FormState, form: FormData): Promise<FormSta
         where: { id },
         data: {
           customerId, issueDate, dueDate: dueDate!, subtotal: t.subtotal, discount: t.discount, vatRate, vatAmount: t.vatAmount,
-          whtRate, whtAmount: t.whtAmount, total: t.total, notes, poNumber, depositPercent: inv.kind === "QUOTE" ? depositPercent : null,
-          items: { create: lines.map((l, i) => ({ description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, amount: round2(l.quantity * l.unitPrice), position: i })) },
+          whtRate, whtAmount: t.whtAmount, total: t.total, notes, poNumber, title, summary, depositPercent: inv.kind === "QUOTE" ? depositPercent : null,
+          items: { create: lines.map((l, i) => ({ description: l.description, details: l.details, quantity: l.quantity, unitPrice: l.unitPrice, amount: round2(l.quantity * l.unitPrice), position: i })) },
         },
       }),
     ]);
   } else {
-    invoiceId = (await createInvoice({ businessId: business.id, customerId, kind, issueDate, dueDate: dueDate!, lines, discount, vatRate, whtRate, notes, poNumber, depositPercent })).id;
+    invoiceId = (await createInvoice({ businessId: business.id, customerId, kind, issueDate, dueDate: dueDate!, lines, discount, vatRate, whtRate, notes, poNumber, depositPercent, title, summary })).id;
   }
 
   // Remember new line items so they autocomplete next time.
   const known = new Set((await db.item.findMany({ where: { businessId: business.id }, select: { name: true } })).map((i) => i.name.toLowerCase()));
-  const fresh = lines.filter((l) => !known.has(l.description.toLowerCase()));
-  if (fresh.length) await db.item.createMany({ data: fresh.map((l) => ({ businessId: business.id, name: l.description, unitPrice: l.unitPrice })) });
+  const fresh = lines.filter((l) => l.unitPrice > 0 && !known.has(l.description.toLowerCase()));
+  const unique = [...new Map(fresh.map((l) => [l.description.toLowerCase(), l])).values()];
+  if (unique.length) await db.item.createMany({ data: unique.map((l) => ({ businessId: business.id, name: l.description, description: l.details, unitPrice: l.unitPrice })) });
 
   revalidatePath("/app/invoices");
   revalidatePath("/app/quotes");
@@ -190,8 +193,9 @@ export async function duplicateInvoice(form: FormData) {
   const copy = await createInvoice({
     businessId: business.id, customerId: inv.customerId, kind: inv.kind as "INVOICE" | "QUOTE", issueDate: issue,
     dueDate: new Date(issue.getTime() + business.paymentTermsDays * 86400000),
-    lines: items.map((i) => ({ description: i.description, quantity: i.quantity, unitPrice: i.unitPrice })),
+    lines: items.map((i) => ({ description: i.description, details: i.details, quantity: i.quantity, unitPrice: i.unitPrice })),
     discount: inv.discount, vatRate: inv.vatRate, whtRate: inv.whtRate, notes: inv.notes, depositPercent: inv.depositPercent,
+    title: inv.title, summary: inv.summary, poNumber: inv.poNumber,
   });
   redirect(`/app/invoices/${copy.id}/edit`);
 }
@@ -203,7 +207,7 @@ export async function convertQuote(form: FormData) {
     db.invoiceItem.findMany({ where: { invoiceId: inv.id }, orderBy: { position: "asc" } }),
     db.invoice.findMany({ where: { depositForId: inv.id, status: { not: "VOID" } } }),
   ]);
-  const lines = items.map((i) => ({ description: i.description, quantity: i.quantity, unitPrice: i.unitPrice }));
+  const lines: LineInput[] = items.map((i) => ({ description: i.description, details: i.details, quantity: i.quantity, unitPrice: i.unitPrice }));
   // The deposit was already invoiced (with its own VAT), so credit it here and the final invoice carries the balance.
   for (const d of deposits) lines.push({ description: `Less deposit invoiced on ${d.number}`, quantity: 1, unitPrice: -(d.subtotal - d.discount) });
   const issue = new Date();
@@ -211,7 +215,7 @@ export async function convertQuote(form: FormData) {
     const n = await createInvoice({
       businessId: business.id, customerId: inv.customerId, kind: "INVOICE", issueDate: issue,
       dueDate: new Date(issue.getTime() + business.paymentTermsDays * 86400000),
-      lines, discount: inv.discount, vatRate: inv.vatRate, whtRate: inv.whtRate, notes: inv.notes, convertedFromId: inv.id, poNumber: inv.poNumber,
+      lines, discount: inv.discount, vatRate: inv.vatRate, whtRate: inv.whtRate, notes: inv.notes, convertedFromId: inv.id, poNumber: inv.poNumber, title: inv.title, summary: inv.summary,
     }, tx);
     await tx.invoice.update({ where: { id: inv.id }, data: { status: "CONVERTED", events: { create: { type: "CONVERTED", note: n.number } } } });
     return n;

@@ -83,6 +83,8 @@ Status: ✅ written and live · 🔜 next. **35 of 36 articles are live.** #36 i
 | 34 | Business name vs limited company: the tax and liability differences | business name vs limited liability company nigeria | Consideration | 7.5 | ✅ |
 | 35 | Outsourced bookkeeping in Nigeria: what it costs and when it's worth it | outsourced bookkeeping nigeria, accountant for small business | Consideration | 7.8 | ✅ |
 | 36 | State of SME finance in Nigeria (original data report from anonymised BizBooks data) | nigeria sme payment delays statistics | Shareable | 7.0 | 🔜 (needs real data) |
+| 37 | How to move your books from Wave or Zoho Books | export data from wave, zoho books export invoices, switch from wave | Decision | 8.2 | ✅ |
+| — | Comparison pages: /compare/zoho-books, /compare/wave (not articles; shared data in src/lib/compare.ts) | zoho books alternative nigeria, wave alternative nigeria | Decision | — | ✅ |
 
 ## Free calculators (lead magnets and link-earners, at /tools)
 

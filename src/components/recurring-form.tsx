@@ -9,13 +9,13 @@ import { FREQUENCIES, TAX } from "@/lib/constants";
 import { computeTotals, naira, parseAmount } from "@/lib/money";
 import { cn, dateInput } from "@/lib/utils";
 
-type Line = { key: number; description: string; quantity: string; unitPrice: string };
+type Line = { key: number; description: string; details: string; quantity: string; unitPrice: string };
 let k = 1;
 
 export type RecurringInitial = {
   id: string; customerId: string; title: string; frequency: string; startAt: string; ends: "never" | "after" | "on";
   maxRuns: string; endAt: string; autoSend: boolean; dueInDays: number; applyVat: boolean; whtRate: number; notes: string;
-  items: { description: string; quantity: number; unitPrice: number }[];
+  items: { description: string; details?: string | null; quantity: number; unitPrice: number }[];
 };
 
 export function RecurringForm({ customers, vatRegistered, vatRate, termsDays, initial, preselectCustomer }: {
@@ -24,7 +24,7 @@ export function RecurringForm({ customers, vatRegistered, vatRate, termsDays, in
   const { state, onSubmit, pending } = useFormAction<FormState>(saveSchedule, {});
   const e = state.errors ?? {};
   const [lines, setLines] = useState<Line[]>(
-    initial?.items.map((i) => ({ key: k++, description: i.description, quantity: String(i.quantity), unitPrice: String(i.unitPrice) })) ?? [{ key: k++, description: "", quantity: "1", unitPrice: "" }],
+    initial?.items.map((i) => ({ key: k++, description: i.description, details: i.details ?? "", quantity: String(i.quantity), unitPrice: String(i.unitPrice) })) ?? [{ key: k++, description: "", details: "", quantity: "1", unitPrice: "" }],
   );
   const [ends, setEnds] = useState(initial?.ends ?? "never");
   const [frequency, setFrequency] = useState(initial?.frequency ?? "MONTHLY");
@@ -90,16 +90,17 @@ export function RecurringForm({ customers, vatRegistered, vatRate, termsDays, in
         <h2 className="text-lg">What's on each invoice?</h2>
         <ul className="mt-3 space-y-3">
           {lines.map((l, i) => (
-            <li key={l.key} className="grid grid-cols-[1fr_5rem_7rem_auto] items-end gap-2">
-              <input className={inputClass} value={l.description} placeholder="Item or service" aria-label={`Item ${i + 1}`} onChange={(ev) => up(l.key, { description: ev.target.value })} />
+            <li key={l.key} className="grid grid-cols-[1fr_5rem_7rem_auto] items-end gap-2 border-b border-line pb-3 last:border-0">
+              <input className={inputClass} value={l.description} placeholder="Item or service" aria-label={`Item ${i + 1} name`} onChange={(ev) => up(l.key, { description: ev.target.value })} />
               <input className={cn(inputClass, "num text-right")} inputMode="decimal" value={l.quantity} aria-label={`Item ${i + 1} quantity`} onChange={(ev) => up(l.key, { quantity: ev.target.value })} />
               <input className={cn(inputClass, "num text-right")} inputMode="decimal" value={l.unitPrice} placeholder="₦" aria-label={`Item ${i + 1} price`} onChange={(ev) => up(l.key, { unitPrice: ev.target.value })} />
               <button type="button" aria-label={`Remove item ${i + 1}`} onClick={() => setLines((ls) => (ls.length > 1 ? ls.filter((x) => x.key !== l.key) : ls))} className="grid size-12 place-items-center rounded-xl text-muted hover:bg-danger-wash hover:text-danger"><Trash2 className="size-5" aria-hidden /></button>
+              <textarea className={cn(inputClass, "col-span-3 min-h-16 py-2 text-sm")} rows={2} value={l.details} placeholder="Description (optional): scope, deliverables or the period covered" aria-label={`Item ${i + 1} description`} onChange={(ev) => up(l.key, { details: ev.target.value })} />
             </li>
           ))}
         </ul>
         {e.items && <p role="alert" className="mt-2 text-sm font-medium text-danger">{e.items}</p>}
-        <button type="button" onClick={() => setLines((ls) => [...ls, { key: k++, description: "", quantity: "1", unitPrice: "" }])} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full px-3 font-semibold text-brand hover:bg-brand-wash">
+        <button type="button" onClick={() => setLines((ls) => [...ls, { key: k++, description: "", details: "", quantity: "1", unitPrice: "" }])} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full px-3 font-semibold text-brand hover:bg-brand-wash">
           <Plus className="size-5" aria-hidden /> Add item
         </button>
         <div className="mt-4 grid gap-4 border-t border-line pt-4 sm:grid-cols-2">

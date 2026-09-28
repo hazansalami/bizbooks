@@ -9,26 +9,27 @@ import { computeTotals, naira, parseAmount } from "@/lib/money";
 import { TAX } from "@/lib/constants";
 import { addDays, cn, dateInput } from "@/lib/utils";
 
-type Line = { key: number; description: string; quantity: string; unitPrice: string };
+type Line = { key: number; description: string; details: string; quantity: string; unitPrice: string };
 type Customer = { id: string; name: string; phone: string | null };
 
 export type InvoiceFormProps = {
   kind: "INVOICE" | "QUOTE";
   customers: Customer[];
-  savedItems: { name: string; unitPrice: number }[];
+  savedItems: { name: string; description: string | null; unitPrice: number }[];
   vatRegistered: boolean;
   vatRate: number;
   termsDays: number;
   pro: boolean;
   initial?: {
     id: string; customerId: string; issueDate: string; dueDate: string; discount: number; vatRate: number; whtRate: number;
-    notes: string; items: { description: string; quantity: number; unitPrice: number }[]; poNumber: string; depositPercent: number | null;
+    notes: string; items: { description: string; details: string | null; quantity: number; unitPrice: number }[]; poNumber: string; depositPercent: number | null;
+    title: string; summary: string;
   };
   preselectCustomer?: string;
 };
 
 let nextKey = 1;
-const blank = (): Line => ({ key: nextKey++, description: "", quantity: "1", unitPrice: "" });
+const blank = (): Line => ({ key: nextKey++, description: "", details: "", quantity: "1", unitPrice: "" });
 
 export function InvoiceForm(p: InvoiceFormProps) {
   const { state, onSubmit, pending } = useFormAction<FormState>(saveInvoice, {});
@@ -39,7 +40,7 @@ export function InvoiceForm(p: InvoiceFormProps) {
   const [customerId, setCustomerId] = useState(p.initial?.customerId ?? p.preselectCustomer ?? (p.customers.length ? "" : "new"));
   const [lines, setLines] = useState<Line[]>(
     p.initial?.items.length
-      ? p.initial.items.map((i) => ({ key: nextKey++, description: i.description, quantity: String(i.quantity), unitPrice: String(i.unitPrice) }))
+      ? p.initial.items.map((i) => ({ key: nextKey++, description: i.description, details: i.details ?? "", quantity: String(i.quantity), unitPrice: String(i.unitPrice) }))
       : [blank()],
   );
   const [issueDate, setIssueDate] = useState(p.initial?.issueDate ?? dateInput(today));
@@ -59,8 +60,9 @@ export function InvoiceForm(p: InvoiceFormProps) {
   );
 
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
-  const priceFor = (name: string) => p.savedItems.find((i) => i.name.toLowerCase() === name.trim().toLowerCase())?.unitPrice;
-  const payload = JSON.stringify(lines.map(({ description, quantity, unitPrice }) => ({ description, quantity, unitPrice })));
+  const savedFor = (name: string) => p.savedItems.find((i) => i.name.toLowerCase() === name.trim().toLowerCase());
+  const payload = JSON.stringify(lines.map(({ description, details, quantity, unitPrice }) => ({ description, details, quantity, unitPrice })));
+  const [heading, setHeading] = useState(!!(p.initial?.title || p.initial?.summary));
 
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-5">
@@ -99,13 +101,28 @@ export function InvoiceForm(p: InvoiceFormProps) {
       </section>
 
       <section className="rounded-2xl border border-line bg-paper p-4 sm:p-6">
-        <h2 className="text-lg">What are you charging for?</h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-lg">What are you charging for?</h2>
+          <button type="button" onClick={() => setHeading((h) => !h)} aria-expanded={heading} className="min-h-11 text-sm font-semibold text-brand hover:underline">
+            {heading ? "Remove heading" : "Add a title and summary"}
+          </button>
+        </div>
+        {heading && (
+          <div className="mt-3 grid gap-4 rounded-xl bg-canvas p-4 sm:grid-cols-2">
+            <Field label={`${isQuote ? "Quote" : "Invoice"} title`} name="title" hint={`Shown at the top in place of “${isQuote ? "Quote" : "Invoice"}”.`}>
+              <Input name="title" maxLength={120} defaultValue={p.initial?.title ?? state.values?.title} placeholder="e.g. Website redesign & renewal" />
+            </Field>
+            <Field label="Summary" name="summary" hint="One line on what this covers.">
+              <Input name="summary" maxLength={300} defaultValue={p.initial?.summary ?? state.values?.summary} placeholder="e.g. Upgrade of acme.com plus a year of hosting" />
+            </Field>
+          </div>
+        )}
         <datalist id="saved-items">
           {p.savedItems.map((i) => <option key={i.name} value={i.name} />)}
         </datalist>
         <ul className="mt-3 space-y-3">
           {lines.map((l, idx) => (
-            <li key={l.key} className="grid grid-cols-[1fr_auto] gap-2 rounded-xl border border-line p-3 sm:grid-cols-[1fr_5rem_8rem_7rem_auto] sm:items-end sm:border-0 sm:p-0">
+            <li key={l.key} className="grid grid-cols-[1fr_auto] gap-2 rounded-xl border border-line p-3 sm:grid-cols-[1fr_5rem_8rem_7rem_auto] sm:items-end sm:rounded-none sm:border-0 sm:border-b sm:px-0 sm:pb-4 sm:pt-0">
               <label className="col-span-2 sm:col-span-1">
                 <span className={cn("mb-1 block text-xs font-semibold text-muted", idx > 0 && "sm:sr-only")}>Item or service</span>
                 <input
@@ -113,11 +130,15 @@ export function InvoiceForm(p: InvoiceFormProps) {
                   list="saved-items"
                   value={l.description}
                   placeholder="e.g. Website redesign, phase 1"
-                  aria-label={`Item ${idx + 1} description`}
+                  aria-label={`Item ${idx + 1} name`}
                   onChange={(ev) => {
                     const description = ev.target.value;
-                    const price = priceFor(description);
-                    update(l.key, { description, ...(price != null && !l.unitPrice ? { unitPrice: String(price) } : {}) });
+                    const saved = savedFor(description);
+                    update(l.key, {
+                      description,
+                      ...(saved && !l.unitPrice ? { unitPrice: String(saved.unitPrice) } : {}),
+                      ...(saved?.description && !l.details ? { details: saved.description } : {}),
+                    });
                   }}
                 />
               </label>
@@ -140,6 +161,16 @@ export function InvoiceForm(p: InvoiceFormProps) {
               >
                 <Trash2 className="size-5" aria-hidden />
               </button>
+              <label className="col-span-2 sm:col-span-4">
+                <textarea
+                  aria-label={`Item ${idx + 1} description`}
+                  className={cn(inputClass, "min-h-16 py-2 text-sm")}
+                  rows={Math.min(8, Math.max(2, l.details.split("\n").length))}
+                  value={l.details}
+                  placeholder="Description (optional): scope, deliverables or the period covered"
+                  onChange={(ev) => update(l.key, { details: ev.target.value })}
+                />
+              </label>
             </li>
           ))}
         </ul>

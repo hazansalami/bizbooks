@@ -39,10 +39,10 @@ export async function saveSchedule(_: FormState, form: FormData): Promise<FormSt
   if (ends === "after" && !(maxRuns && maxRuns > 0)) errors.maxRuns = "Enter how many invoices to send.";
   if (ends === "on" && !endAt) errors.endAt = "Choose the last date.";
 
-  let items: { description: string; quantity: number; unitPrice: number }[] = [];
+  let items: { description: string; details: string | null; quantity: number; unitPrice: number }[] = [];
   try {
-    items = (JSON.parse(str(form, "items") || "[]") as { description: string; quantity: string; unitPrice: string }[])
-      .map((l) => ({ description: String(l.description).trim(), quantity: parseAmount(String(l.quantity)), unitPrice: round2(parseAmount(String(l.unitPrice))) }))
+    items = (JSON.parse(str(form, "items") || "[]") as { description: string; details?: string; quantity: string; unitPrice: string }[])
+      .map((l) => ({ description: String(l.description).trim(), details: String(l.details ?? "").trim().slice(0, 4000) || null, quantity: parseAmount(String(l.quantity)), unitPrice: round2(parseAmount(String(l.unitPrice))) }))
       .filter((l) => l.description);
   } catch {}
   if (!items.length || items.some((l) => !(l.quantity > 0) || !(l.unitPrice >= 0))) errors.items = "Add at least one item with a quantity and price.";

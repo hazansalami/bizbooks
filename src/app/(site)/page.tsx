@@ -1,8 +1,9 @@
 import Link from "next/link";
 import {
-  ArrowDownLeft, ArrowRight, ArrowUpRight, BarChart3, Check, FileText, Landmark, Minus, ShieldCheck, Smartphone, UsersRound,
+  ArrowDownLeft, ArrowRight, ArrowUpRight, BarChart3, Check, FileText, Landmark, ShieldCheck, Smartphone, UsersRound,
 } from "lucide-react";
 import { ButtonLink } from "@/components/ui";
+import { CompareTable } from "@/components/compare-table";
 import { APP_NAME } from "@/lib/constants";
 import { SOLUTIONS, SOLUTION_GROUPS } from "./solutions/data";
 import { allArticles, CATEGORIES } from "@/lib/insights";
@@ -22,8 +23,12 @@ const faqs = [
     a: `No. Clients pay into your company's own bank account, or through your own Paystack or Flutterwave account. ${APP_NAME} creates the payment link and confirms the result, but never receives, holds or moves your money.`,
   },
   {
+    q: "How is BizBooks different from Zoho Books?",
+    a: "Zoho Books' Nigeria edition handles VAT, WHT and e-invoicing, but Zoho Payroll isn't available in Nigeria and Paystack needs an add-on. BizBooks includes 2026 PAYE, pension and NHF payroll, takes payments through your own Paystack or Flutterwave account, tracks every Nigerian tax deadline and offers done-for-you bookkeeping. You can import your Zoho Books invoices and clients in minutes.",
+  },
+  {
     q: "We use Wave today. Why switch?",
-    a: "Wave no longer sends invoices or reminders for businesses outside the US and Canada, and its payments don't support Nigerian gateways. BizBooks sends invoices and reminders, takes payments through Paystack and Flutterwave, and handles Nigerian VAT, WHT, PAYE and pension.",
+    a: "Wave no longer sends invoices or reminders for businesses outside the US and Canada, and its payments don't support Nigerian gateways. BizBooks sends invoices and reminders, takes payments through Paystack and Flutterwave, and handles Nigerian VAT, WHT, PAYE and pension. Import your Wave history from a CSV export and your retainers keep running.",
   },
   {
     q: "Does it run payroll and PAYE?",
@@ -169,45 +174,21 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Moving from Wave */}
+      {/* Moving from Wave or Zoho Books */}
       <section className="border-y border-line bg-paper">
-        <div className="mx-auto max-w-4xl px-4 py-20 sm:px-6">
-          <h2 className="text-3xl sm:text-4xl">Moving from Wave?</h2>
-          <p className="mt-3 text-lg text-ink-soft">
-            Wave has stopped sending invoices and reminders for businesses outside the US and Canada, and its payments
-            don't work with Nigerian gateways. {APP_NAME} keeps what made Wave simple and adds what Nigerian companies need.
+        <div className="mx-auto max-w-5xl px-4 py-20 sm:px-6">
+          <h2 className="text-3xl sm:text-4xl">Moving from Wave or Zoho Books?</h2>
+          <p className="mt-3 max-w-3xl text-lg text-ink-soft">
+            Wave no longer sends invoices outside the US and Canada. Zoho Books is a big general suite without Nigerian payroll.
+            {" "}{APP_NAME} is built for Nigerian companies that bill clients and pay a team, and it brings your clients,
+            invoices and retainers across from either one in minutes.
           </p>
-          <div className="mt-8 overflow-x-auto rounded-2xl border border-line">
-            <table className="w-full min-w-[34rem] text-left text-sm">
-              <thead className="bg-canvas">
-                <tr>
-                  <th scope="col" className="p-4 font-semibold"><span className="sr-only">Feature</span></th>
-                  <th scope="col" className="p-4 font-bold text-brand-deep">{APP_NAME}</th>
-                  <th scope="col" className="p-4 font-semibold">Wave (in Nigeria)</th>
-                  <th scope="col" className="p-4 font-semibold">Spreadsheets</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  ["Send invoices and automatic reminders", true, false, false],
-                  ["Online payments with Paystack or Flutterwave", true, false, false],
-                  ["Dashboard: cash flow, profit, who owes what", true, true, false],
-                  ["Payroll with PAYE and pension (2026 rules)", true, false, false],
-                  ["VAT, WHT, PAYE and pension deadlines", true, false, false],
-                  ["Quotes with deposits", true, true, false],
-                  ["Free to start", true, true, true],
-                ].map(([label, a, b, c]) => (
-                  <tr key={label as string} className="border-t border-line">
-                    <th scope="row" className="p-4 font-medium">{label as string}</th>
-                    {[a, b, c].map((v, i) => (
-                      <td key={i} className="p-4">{v ? <Check className="size-5 text-brand" aria-label="Yes" /> : <Minus className="size-5 text-muted/60" aria-label="No" />}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="mt-8"><CompareTable rivals={["zoho", "wave"]} homeOnly /></div>
+          <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+            <Link href="/compare/zoho-books" className="font-semibold text-brand hover:underline">BizBooks vs Zoho Books, in full</Link>
+            <Link href="/compare/wave" className="font-semibold text-brand hover:underline">BizBooks vs Wave, in full</Link>
+            <span className="text-xs text-muted">From Zoho&apos;s and Wave&apos;s own pages and notices, September 2026.</span>
           </div>
-          <p className="mt-3 text-xs text-muted">Based on Wave's own notice to users outside the US and Canada, September 2026.</p>
         </div>
       </section>
 

@@ -33,6 +33,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
       <PageHeader
         title="Invoices"
         actions={<>
+          <ButtonLink href="/app/import" variant="secondary">Import</ButtonLink>
           <ButtonLink href="/app/invoices/new">New invoice</ButtonLink>
         </>}
       />
@@ -41,7 +42,10 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
           icon={<FileText className="size-6" aria-hidden />}
           title="No invoices yet"
           body="Bill a client in about a minute. They get a professional invoice by email with a secure “Pay now” link."
-          action={<ButtonLink href="/app/invoices/new" size="lg">Create my first invoice</ButtonLink>}
+          action={<div className="flex flex-wrap justify-center gap-2">
+            <ButtonLink href="/app/invoices/new" size="lg">Create my first invoice</ButtonLink>
+            <ButtonLink href="/app/import" size="lg" variant="secondary">Import from Wave or Zoho</ButtonLink>
+          </div>}
         />
       ) : (
         <>

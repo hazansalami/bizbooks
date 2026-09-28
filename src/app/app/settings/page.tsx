@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ChevronRight, CreditCard, Landmark } from "lucide-react";
+import { ChevronRight, CreditCard, Landmark, Palette, Upload } from "lucide-react";
+import { INVOICE_TEMPLATES, templateId } from "@/lib/invoice-templates";
 import { requireBusiness } from "@/lib/auth";
 import { isPro } from "@/lib/plan";
 import { PageHeader } from "@/components/ui";
@@ -12,10 +13,12 @@ export default async function Settings() {
   return (
     <>
       <PageHeader title="Settings" />
-      <div className="mb-6 grid gap-3 sm:grid-cols-2">
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
           ["/app/settings/payments", Landmark, "How you get paid", "Bank accounts, Paystack and Flutterwave"],
           ["/app/settings/billing", CreditCard, "Your plan", isPro(b) ? "Pro" : "Free plan"],
+          ["/app/settings/invoice-style", Palette, "Invoice style", `${INVOICE_TEMPLATES.find((t) => t.id === templateId(b.invoiceTemplate))!.name} · 5 styles to choose from`],
+          ["/app/import", Upload, "Import from Wave or Zoho Books", "Clients, invoices and services from a CSV export"],
         ].map(([href, Icon, title, sub]) => {
           const I = Icon as typeof Landmark;
           return (

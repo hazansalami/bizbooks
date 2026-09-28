@@ -116,3 +116,7 @@ body {
 .article-body td { border-top: 1px solid var(--line); padding: 0.7em 0.9em; vertical-align: top; }
 .article-body input[type="checkbox"] { margin-right: 0.5em; accent-color: var(--brand); }
 .article-body li:has(> input[type="checkbox"]) { list-style: none; margin-left: -1.4em; }
+
+/* Keep brand-colour bands and table headers when printing or saving invoices as PDF. */
+.print-sheet { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.print-sheet tr { break-inside: avoid; }

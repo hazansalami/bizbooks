@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
   // 2. Automatic payment reminders (Pro).
   const open = await db.invoice.findMany({
     where: {
-      kind: "INVOICE", status: { in: ["SENT", "PARTIAL"] }, customer: { email: { not: null } },
+      kind: "INVOICE", status: { in: ["SENT", "PARTIAL"] }, customer: { email: { not: null } }, importSource: null,
       business: { autoReminders: true, plan: "PRO" },
       OR: [{ lastReminderAt: null }, { lastReminderAt: { lt: today } }],
       dueDate: { gte: addDays(today, -8), lt: addDays(today, 2) },

@@ -16,7 +16,7 @@ export default async function EditInvoice({ params }: { params: Promise<{ id: st
   if (inv.amountPaid > 0 || inv.status === "VOID" || inv.status === "CONVERTED") redirect(`/app/invoices/${id}`);
   const [customers, items] = await Promise.all([
     db.customer.findMany({ where: { businessId: business.id }, orderBy: { name: "asc" }, select: { id: true, name: true, phone: true } }),
-    db.item.findMany({ where: { businessId: business.id }, orderBy: { name: "asc" }, select: { name: true, unitPrice: true } }),
+    db.item.findMany({ where: { businessId: business.id }, orderBy: { name: "asc" }, select: { name: true, description: true, unitPrice: true } }),
   ]);
   return (
     <>
@@ -32,7 +32,8 @@ export default async function EditInvoice({ params }: { params: Promise<{ id: st
         initial={{
           id: inv.id, customerId: inv.customerId, issueDate: dateInput(inv.issueDate), dueDate: dateInput(inv.dueDate),
           discount: inv.discount, vatRate: inv.vatRate, whtRate: inv.whtRate, notes: inv.notes ?? "", poNumber: inv.poNumber ?? "", depositPercent: inv.depositPercent,
-          items: inv.items.map((i) => ({ description: i.description, quantity: i.quantity, unitPrice: i.unitPrice })),
+          items: inv.items.map((i) => ({ description: i.description, details: i.details, quantity: i.quantity, unitPrice: i.unitPrice })),
+          title: inv.title ?? "", summary: inv.summary ?? "",
         }}
       />
     </>
