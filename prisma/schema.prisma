@@ -22,6 +22,8 @@ model User {
   // When and which version of the Terms of Service and Privacy Policy the user accepted at sign-up.
   termsAcceptedAt DateTime?
   termsVersion    String?
+  // Referral code captured at sign-up (from /r/<code>), applied when the business is created.
+  signupRef       String?
   // Sessions issued before this are rejected, so a password reset signs out every other device.
   passwordChangedAt DateTime?
   createdAt    DateTime  @default(now())
@@ -116,6 +118,27 @@ model Business {
   feedback      CancellationFeedback[]
   taxFilings    TaxFiling[]
   paymentAccount PaymentAccount?
+
+  // Pro trial (reverse trial): everyone starts on Pro and falls back to Free unless they pay.
+  // While trialing, proUntil === trialEndsAt; paying or earning referral months moves proUntil past it.
+  trialStartedAt  DateTime?
+  trialEndsAt     DateTime?
+  // Earn-more-days steps already rewarded: FIRST_INVOICE | GET_PAID | PAYROLL_OR_IMPORT
+  trialBonuses    String[]  @default([])
+  trialEmailStep  Int       @default(0)
+
+  // Referrals: this business's own code, who referred it, and rewards banked for later.
+  referralCode    String?   @unique
+  referredById    String?
+  referredBy      Business? @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referredBusinesses Business[] @relation("Referrals")
+  referralsMade   Referral[] @relation("ReferralReferrer")
+  referralReceived Referral? @relation("ReferralReferred")
+  // Fee-free BizBooks Payments earned before a payment account exists; added when it's switched on.
+  feeFreeBonus    Int       @default(0)
+  // Pro businesses can opt in to the "Sent with BizBooks" referral line on their invoices.
+  showReferralFooter Boolean @default(false)
+  referralPromptedAt DateTime?
 }
 
 model BankAccount {
@@ -624,4 +647,25 @@ model PaymentAccount {
   updatedAt      DateTime  @updatedAt
 
   @@index([status])
+}
+
+/// A business that signed up through another business's referral link.
+model Referral {
+  id          String    @id @default(cuid())
+  referrerId  String
+  referrer    Business  @relation("ReferralReferrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredId  String    @unique
+  referred    Business  @relation("ReferralReferred", fields: [referredId], references: [id], onDelete: Cascade)
+  // LINK | INVOICE (the "Sent with BizBooks" line on an invoice)
+  source      String    @default("LINK")
+  // PENDING | QUALIFIED | REJECTED | EXPIRED
+  status      String    @default("PENDING")
+  reason      String?
+  rewardMonths Int      @default(0)
+  rewardFeeFree Int     @default(0)
+  qualifiedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([referrerId, status])
+  @@index([status, createdAt])
 }

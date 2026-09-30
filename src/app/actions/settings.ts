@@ -1,5 +1,7 @@
 "use server";
 
+import { grantTrialBonus } from "@/lib/growth";
+
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireBusiness } from "@/lib/auth";
@@ -87,6 +89,7 @@ export async function connectGatewayAction(_: FormState, form: FormData): Promis
   if (!secretKey) return { errors: { secretKey: "Paste your secret key." }, values: { provider } };
   const r = await saveGateway(business.id, { provider, secretKey, publicKey: str(form, "publicKey"), webhookHash: str(form, "webhookHash") });
   if (!r.ok) return { errors: { secretKey: r.error }, values: { provider } };
+  await grantTrialBonus(business.id, "GET_PAID");
   revalidatePath("/app/settings/payments");
   return { ok: true, message: `${r.name} connected${r.mode === "TEST" ? " in test mode. Switch to your live key before sending real invoices" : ""}.` };
 }

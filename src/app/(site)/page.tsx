@@ -5,7 +5,7 @@ import {
 import { ButtonLink } from "@/components/ui";
 import { CompareTable } from "@/components/compare-table";
 import { InstallButton } from "@/components/pwa";
-import { APP_NAME } from "@/lib/constants";
+import { APP_NAME, TRIAL } from "@/lib/constants";
 import { SOLUTIONS, SOLUTION_GROUPS } from "./solutions/data";
 import { allArticles, CATEGORIES } from "@/lib/insights";
 import { TOOLS } from "@/lib/tools";
@@ -17,7 +17,7 @@ const faqs = [
   },
   {
     q: "Is it really free to start?",
-    a: "Yes. Invoicing, quotes, online payments, expenses, the dashboard and tax tracking are free, with payroll for up to 3 people. Pro adds automation (recurring invoices and expenses without limits, automatic reminders), payroll for your whole team, deposits on quotes and your own branding.",
+    a: "Yes. Every new business gets 30 days of Pro free, with no card needed, and can earn up to 21 more days by setting up. After that, invoicing, quotes, online payments, expenses, the dashboard and tax tracking stay free, with payroll for up to 3 people. Pro adds automation (recurring invoices and expenses without limits, automatic reminders), payroll for your whole team, deposits on quotes and your own branding.",
   },
   {
     q: `Does ${APP_NAME} hold our money?`,
@@ -63,7 +63,7 @@ export default function Home() {
               <ButtonLink href="#how-it-works" size="lg" variant="secondary">See what's inside</ButtonLink>
             </div>
             <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted">
-              {["Free to start, no card needed", "PAYE and VAT for 2026", "Your money never passes through us"].map((t) => (
+              {[`${TRIAL.days} days of Pro free, no card needed`, "PAYE and VAT for 2026", "Your money never passes through us"].map((t) => (
                 <li key={t} className="flex items-center gap-1.5"><Check className="size-4 text-brand" aria-hidden />{t}</li>
               ))}
             </ul>
@@ -291,7 +291,7 @@ export default function Home() {
       <section className="bg-brand text-white">
         <div className="mx-auto max-w-4xl px-4 py-20 text-center sm:px-6">
           <h2 className="text-3xl sm:text-5xl">See your company's finances clearly, starting today.</h2>
-          <p className="mx-auto mt-4 max-w-xl text-lg text-white/85">Free to start. The setup guide takes a few minutes, and you can skip anything you're not ready for.</p>
+          <p className="mx-auto mt-4 max-w-xl text-lg text-white/85">Start with {TRIAL.days} days of Pro free. The setup guide takes a few minutes, and you can skip anything you're not ready for.</p>
           <ButtonLink href="/signup" size="lg" variant="light" className="mt-8">Create my free account</ButtonLink>
           <p className="mt-4 text-sm text-white/75">Already have an account? <Link href="/login" className="font-semibold underline">Log in</Link></p>
         </div>

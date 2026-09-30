@@ -26,6 +26,7 @@
 - [BizBooks vs Wave](/compare/wave): Wave no longer sends invoices outside the US and Canada
 
 ## Pricing
+- 30-day Pro trial for every new business (no card), extendable to 51 days by setting up; 60 days when referred by a BizBooks user. Referral rewards: 3 months of Pro per business that gets going.
 - Free: invoicing, payments, expenses, dashboard, tax tracking, payroll for up to 3 people
 - Pro: unlimited recurring items, full payroll with emailed payslips, quote deposits, reminders, branding, CSV exports
 

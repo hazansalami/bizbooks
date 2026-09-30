@@ -1,5 +1,8 @@
 "use server";
 
+import { grantTrialBonus } from "@/lib/growth";
+import { TRIAL } from "@/lib/constants";
+
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireBusiness } from "@/lib/auth";
@@ -10,6 +13,13 @@ import { str } from "@/lib/utils";
 import { accountMatchesBusiness, createSubaccount, listBanks, paymentsEnabled, resolveAccount, updateSubaccount } from "@/lib/platform-payments";
 import type { FormState } from "@/components/form-bits";
 
+/** Switching on BizBooks Payments during the trial: +7 days of Pro and extra fee-free payments, once. */
+async function paymentsTrialBonus(businessId: string) {
+  if (await grantTrialBonus(businessId, "GET_PAID")) {
+    await db.paymentAccount.update({ where: { businessId }, data: { feeFreeLeft: { increment: TRIAL.paymentsBonusFeeFree } } });
+  }
+}
+
 async function bankFrom(form: FormData) {
   const code = str(form, "bankCode");
   return (await listBanks()).find((b) => b.code === code) ?? null;
@@ -17,7 +27,7 @@ async function bankFrom(form: FormData) {
 
 /** Step 1 in settings: look up the account name so the owner can confirm it's theirs. */
 export async function checkBankAccount(_: FormState, form: FormData): Promise<FormState> {
-  const { business } = await requireBusiness();
+  const { business } = await requireBusiness({ allowOnboarding: true });
   const accountNumber = str(form, "accountNumber").replace(/\D/g, "");
   const values = { bankCode: str(form, "bankCode"), accountNumber };
   const bank = await bankFrom(form);
@@ -40,7 +50,7 @@ async function notifyOwner(businessId: string, subject: string, paragraphs: stri
  * once; anything else waits for a person to review it, so settlements can't be quietly redirected.
  */
 export async function activatePayments(_: FormState, form: FormData): Promise<FormState> {
-  const { business, user } = await requireBusiness();
+  const { business, user } = await requireBusiness({ allowOnboarding: true });
   const values = { bankCode: str(form, "bankCode"), accountNumber: str(form, "accountNumber").replace(/\D/g, "") };
   if (!paymentsEnabled()) return { message: "BizBooks Payments isn't available yet.", values };
   if (!business.rcNumber) return { message: "Add your CAC number (RC or BN) under Settings first. BizBooks Payments is for registered businesses.", values };
@@ -82,10 +92,12 @@ export async function activatePayments(_: FormState, form: FormData): Promise<Fo
   } else {
     await db.paymentAccount.upsert({
       where: { businessId: business.id },
-      create: { businessId: business.id, ...details, subaccountCode, status, reviewNote, termsAcceptedAt: new Date() },
+      create: { businessId: business.id, ...details, subaccountCode, status, reviewNote, termsAcceptedAt: new Date(), feeFreeLeft: 5 + business.feeFreeBonus },
       update: { ...details, ...clearPending, subaccountCode, status, reviewNote, termsAcceptedAt: new Date() },
     });
   }
+  if (!existing && business.feeFreeBonus > 0) await db.business.update({ where: { id: business.id }, data: { feeFreeBonus: 0 } });
+  if (status === "ACTIVE") await paymentsTrialBonus(business.id);
   const acct = `${esc(bank.name)} account ending ${values.accountNumber.slice(-4)}`;
   await notifyOwner(business.id,
     status === "ACTIVE" ? (existing ? "Your payout account was changed" : "BizBooks Payments is on") : "We're reviewing your payout account",
@@ -99,7 +111,7 @@ export async function activatePayments(_: FormState, form: FormData): Promise<Fo
 }
 
 export async function setPaymentsOn(form: FormData) {
-  const { business } = await requireBusiness();
+  const { business } = await requireBusiness({ allowOnboarding: true });
   const a = await db.paymentAccount.findUnique({ where: { businessId: business.id } });
   if (!a) return;
   const on = str(form, "on") === "1";
@@ -130,6 +142,7 @@ export async function adminReviewPaymentAccount(form: FormData) {
       await db.paymentAccount.update({ where: { id: a.id }, data: { reviewNote: `Paystack error: ${s.error}` } });
     } else {
       await db.paymentAccount.update({ where: { id: a.id }, data: { ...target, ...clearPending, status: "ACTIVE", reviewNote: null, subaccountCode: s.code } });
+      await paymentsTrialBonus(b.id);
       await notifyOwner(b.id, "BizBooks Payments is on", [`We've checked your ${esc(target.bankName)} account ending ${target.accountNumber.slice(-4)}. Payments now settle there.`]);
     }
     await logAdmin(admin.email, "PAYMENTS_APPROVE", b.id, `${target.bankName} ••${target.accountNumber.slice(-4)} (${target.accountName})`);

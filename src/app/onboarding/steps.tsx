@@ -1,5 +1,8 @@
 "use client";
 
+import { PaymentsSetup } from "@/components/payments-setup";
+import { TRIAL } from "@/lib/constants";
+
 import Link from "next/link";
 import { useState } from "react";
 import { ExternalLink, ImagePlus, Lock } from "lucide-react";
@@ -146,18 +149,34 @@ export function BankStep() {
   );
 }
 
-export function PaymentsStep() {
+type BizBooksPaymentsProps = React.ComponentProps<typeof PaymentsSetup>;
+
+export function PaymentsStep({ bizbooks }: { bizbooks?: BizBooksPaymentsProps }) {
   const { state, onSubmit, pending } = useFormAction<FormState>(savePaymentsStep, {});
   const e = state.errors ?? {};
   const v = state.values ?? {};
   const [provider, setProvider] = useState(v.provider ?? "PAYSTACK");
   const paystack = provider === "PAYSTACK";
   return (
-    <form onSubmit={onSubmit} noValidate>
+    <>
       <StepHeader
         title="Get paid online, straight to your account"
-        body="Connect your company's own Paystack or Flutterwave account and every invoice gets a secure “Pay now” link for card, transfer and USSD."
+        body={bizbooks
+          ? "Every invoice gets a secure “Pay now” link for card, transfer and USSD. Add your business bank account, or connect your own Paystack or Flutterwave."
+          : "Connect your company's own Paystack or Flutterwave account and every invoice gets a secure “Pay now” link for card, transfer and USSD."}
       />
+      {bizbooks && (
+        <div className="mb-6 rounded-2xl border-2 border-brand/40 bg-paper p-5 sm:p-6">
+          <p className="text-xs font-bold uppercase tracking-widest text-brand-deep">Easiest · +{TRIAL.bonusDays} days of Pro</p>
+          <h2 className="mt-1 text-lg">BizBooks Payments: just your business bank account</h2>
+          <p className="mt-1 text-sm text-ink-soft">No Paystack account or keys. Paystack settles straight to your bank. ₦500 per payment, and your first {5 + TRIAL.paymentsBonusFeeFree} are free during your trial.</p>
+          <div className="mt-4"><PaymentsSetup {...bizbooks} /></div>
+          <p className="mt-3 text-sm text-muted">Once it&apos;s on, press “I&apos;ll do this later” below to carry on.</p>
+        </div>
+      )}
+      {bizbooks && <p className="mb-3 text-sm font-semibold text-muted">Or connect your own Paystack or Flutterwave account</p>}
+      {/* The BizBooks Payments setup above has its own forms, so it must sit outside this one. */}
+      <form onSubmit={onSubmit} noValidate>
       <Notice tone="brand" className="mb-5">
         Money goes straight from your client to your Paystack or Flutterwave account, then to your bank. BizBooks never touches it.
       </Notice>
@@ -206,7 +225,8 @@ export function PaymentsStep() {
         </Field>
       </div>
       <Actions back="bank" pending={pending} primary="Check and connect" skip="I'll do this later" />
-    </form>
+      </form>
+    </>
   );
 }
 

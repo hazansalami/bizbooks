@@ -3,7 +3,7 @@ import type { FullInvoice } from "@/lib/invoices";
 import { amountInWords, balanceDue, money } from "@/lib/money";
 import { cn, formatDate, initials } from "@/lib/utils";
 import { isPro } from "@/lib/plan";
-import { APP_NAME } from "@/lib/constants";
+import { APP_NAME, TRIAL } from "@/lib/constants";
 import { shade, templateId, textOn, type InvoiceTemplateId } from "@/lib/invoice-templates";
 
 /**
@@ -155,7 +155,14 @@ function PayAndNotes({ d, boxed = true }: { d: Doc; boxed?: boolean }) {
           {b.invoiceFooter && <p>{b.invoiceFooter}</p>}
         </div>
       )}
-      {!isPro(b) && <p className="mt-8 text-center text-xs text-muted">Created with {APP_NAME}, free invoicing for Nigerian businesses</p>}
+      {(!isPro(b) || b.showReferralFooter) && (
+        // Every invoice is a referral: clients are businesses too. The link credits the business that sent it.
+        <p className="mt-8 text-center text-xs text-muted">
+          Sent with <a href={b.referralCode ? `/r/${b.referralCode}?src=invoice` : "/signup"} className="font-semibold text-brand-deep underline-offset-2 hover:underline">{APP_NAME}</a>
+          {" · "}
+          <a href={b.referralCode ? `/r/${b.referralCode}?src=invoice` : "/signup"} className="underline-offset-2 hover:underline">Invoicing, payroll &amp; tax for Nigerian businesses. Get {TRIAL.referredDays} days of Pro free →</a>
+        </p>
+      )}
     </>
   );
 }

@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { STEPS, STEP_LABELS, type Step } from "@/lib/onboarding-steps";
 import { BankStep, BrandStep, BusinessStep, PaymentsStep, TaxStep } from "./steps";
+import { PLATFORM_FEE, listBanks, paymentsEnabled } from "@/lib/platform-payments";
+import { naira } from "@/lib/money";
 
 export const metadata: Metadata = { title: "Set up your business", robots: { index: false } };
 
@@ -44,7 +46,10 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
         />
       )}
       {step === "bank" && <BankStep />}
-      {step === "payments" && <PaymentsStep />}
+      {step === "payments" && <PaymentsStep bizbooks={b && paymentsEnabled() ? {
+        banks: await listBanks(), hasRc: !!b.rcNumber, account: null,
+        fee: { amount: naira(PLATFORM_FEE.amount), freeBelow: naira(PLATFORM_FEE.freeBelow), paystack: "1.5% + ₦100, capped at ₦2,000" },
+      } : undefined} />}
       {step === "tax" && <TaxStep defaults={{ vatRegistered: b?.vatRegistered ?? false, tin: b?.tin ?? "", paymentTermsDays: b?.paymentTermsDays ?? 30, professionalServices: b?.professionalServices ?? false }} />}
       {step === "brand" && <BrandStep businessName={b?.name ?? ""} defaults={{ logo: b?.logo ?? "", brandColor: b?.brandColor ?? "#0E7A55" }} />}
     </div>

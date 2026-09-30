@@ -68,6 +68,7 @@ export async function loadBusinessRows(now = new Date()) {
       select: {
         id: true, name: true, industry: true, teamSize: true, plan: true, proUntil: true, pausedUntil: true, discountPercent: true, discountUntil: true,
         cancelAtEnd: true, onboardedAt: true, createdAt: true, lastActiveAt: true, owner: { select: { email: true, fullName: true, phone: true } },
+        trialStartedAt: true, trialEndsAt: true,
       },
     }),
     db.invoice.groupBy({ by: ["businessId"], where: { sentAt: { not: null }, importSource: null }, _count: { _all: true } }),

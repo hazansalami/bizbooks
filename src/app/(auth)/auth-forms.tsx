@@ -24,12 +24,13 @@ function PasswordInput({ name, error, autoComplete }: { name: string; error?: st
   );
 }
 
-export function SignupForm() {
+export function SignupForm({ referral = "" }: { referral?: string }) {
   const { state, onSubmit, pending } = useFormAction<FormState>(signup, {});
   const e = state.errors ?? {};
   const v = state.values ?? {};
   return (
     <form onSubmit={onSubmit} className="space-y-5" noValidate>
+      <input type="hidden" name="ref" value={referral} />
       <Field label="Your name" name="fullName" error={e.fullName} required>
         <Input name="fullName" autoComplete="name" defaultValue={v.fullName} required error={e.fullName} />
       </Field>
