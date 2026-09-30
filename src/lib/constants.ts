@@ -170,3 +170,42 @@ export const CANCEL_REASONS = [
   { value: "CLOSED", label: "I've closed or paused my business" },
   { value: "OTHER", label: "Something else" },
 ] as const;
+
+/*
+  Growth programme. Everyone starts with a Pro trial (a "reverse trial": at the end they fall back to Free,
+  nothing is deleted). Referred businesses get a longer trial; referrers earn Pro time and fee-free payments
+  once the business they referred is genuinely using BizBooks.
+*/
+export const TRIAL = {
+  days: 30,
+  referredDays: 60,
+  bonusDays: 7,
+  // Earn-more-days steps: the habits that predict a business sticking around.
+  bonuses: [
+    { key: "FIRST_INVOICE", label: "Send your first invoice" },
+    { key: "GET_PAID", label: "Turn on online payments" },
+    { key: "PAYROLL_OR_IMPORT", label: "Run payroll or import from Wave or Zoho" },
+  ],
+  // Turning on BizBooks Payments during the trial also adds these fee-free payments.
+  paymentsBonusFeeFree: 5,
+} as const;
+
+export const REFERRAL = {
+  rewardMonths: 3,
+  rewardFeeFree: 10,
+  // Pro time can bank up to this far ahead (lifetime Pro is the exception).
+  bankCapMonths: 24,
+  // A referral qualifies once the referred business sends 3 invoices to 2+ clients and a client opens one,
+  // or takes a payment through BizBooks Payments, within this many days of joining.
+  qualifyWithinDays: 60,
+  minInvoices: 3,
+  minClients: 2,
+  milestones: [
+    { count: 3, label: "A year of Pro and a Partner badge", bonusMonths: 3 },
+    { count: 10, label: "Pro free for life", lifetime: true },
+    { count: 25, label: "Lifetime Pro plus a free Advisors bookkeeping review", lifetime: true },
+  ],
+} as const;
+
+/** Stands in for "forever" on lifetime Pro. */
+export const LIFETIME_PRO_UNTIL = new Date("2099-12-31T00:00:00Z");

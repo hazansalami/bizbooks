@@ -1,4 +1,5 @@
 import "server-only";
+import { ensureReferralCode } from "./growth";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { db } from "./db";
@@ -25,6 +26,7 @@ export async function requireBusiness(opts: { allowOnboarding?: boolean } = {}) 
   const business = user.business;
   if (!business) redirect("/onboarding");
   if (!business.onboardedAt && !opts.allowOnboarding) redirect("/onboarding");
+  if (!business.referralCode) business.referralCode = await ensureReferralCode(business.id, business.name);
   // Cheap activity heartbeat for the churn-risk checks in the daily job.
   if (Date.now() - business.lastActiveAt.getTime() > 3600_000) {
     await db.business.update({ where: { id: business.id }, data: { lastActiveAt: new Date() } });

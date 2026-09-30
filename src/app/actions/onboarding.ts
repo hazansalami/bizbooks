@@ -9,6 +9,7 @@ import { fieldErrors, str } from "@/lib/utils";
 import type { FormState } from "@/components/form-bits";
 import { STEPS } from "@/lib/onboarding-steps";
 import { PROFESSIONAL_INDUSTRIES } from "@/lib/constants";
+import { attachReferral, ensureReferralCode, grantTrialBonus, startTrial } from "@/lib/growth";
 
 
 async function context() {
@@ -53,7 +54,14 @@ export async function saveBusinessStep(_: FormState, form: FormData): Promise<Fo
     await db.business.update({ where: { id: business.id }, data });
     await advance(business.id, 0);
   } else {
-    await db.business.create({ data: { ...data, ownerId: user.id, onboardingStep: 1 } });
+    const created = await db.$transaction(async (tx) => {
+      const b = await tx.business.create({ data: { ...data, ownerId: user.id, onboardingStep: 1 } });
+      const [code, source] = (user.signupRef ?? "").split("|");
+      const referred = await attachReferral(tx, b.id, user.id, code, source);
+      await startTrial(tx, b.id, referred);
+      return b;
+    });
+    await ensureReferralCode(created.id, created.name);
   }
   go(1);
   return {};
@@ -92,6 +100,7 @@ export async function savePaymentsStep(_: FormState, form: FormData): Promise<Fo
   if (!secretKey) return { errors: { secretKey: "Paste your secret key, or choose “I'll do this later”." }, values };
   const r = await saveGateway(business.id, { provider, secretKey, publicKey: str(form, "publicKey") });
   if (!r.ok) return { errors: { secretKey: r.error }, values };
+  await grantTrialBonus(business.id, "GET_PAID");
   await advance(business.id, 2);
   go(3);
   return {};

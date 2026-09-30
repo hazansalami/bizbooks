@@ -1,3 +1,4 @@
+import { grantTrialBonus } from "@/lib/growth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
@@ -46,6 +47,7 @@ export async function POST(req: Request) {
   }
   try {
     const result: ImportResult = await importData(user.business.id, body);
+    if (result.invoicesCreated > 0) await grantTrialBonus(user.business.id, "PAYROLL_OR_IMPORT");
     return NextResponse.json(result);
   } catch (e) {
     console.error("import", e);

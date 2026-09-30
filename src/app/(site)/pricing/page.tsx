@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Check } from "lucide-react";
 import { ButtonLink } from "@/components/ui";
-import { APP_NAME, PLANS } from "@/lib/constants";
+import { APP_NAME, PLANS, TRIAL } from "@/lib/constants";
 import { naira } from "@/lib/money";
 
 export const metadata: Metadata = {
@@ -19,6 +19,9 @@ export default function Pricing() {
         <h1 className="text-4xl sm:text-5xl">Start free. Upgrade when it pays for itself.</h1>
         <p className="mx-auto mt-4 max-w-2xl text-lg text-ink-soft">
           If one automatic reminder gets one late client to pay, Pro has covered its cost for the year.
+        </p>
+        <p className="mx-auto mt-4 inline-flex rounded-full bg-brand-wash px-4 py-2 text-sm font-semibold text-brand-deep">
+          Every new business gets {TRIAL.days} days of Pro free. No card, nothing to cancel.
         </p>
       </div>
 

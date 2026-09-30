@@ -78,6 +78,8 @@ export default function Terms() {
 
         <S id="plans" title="6. Plans, fees and cancellation">
           <p>Some features require a paid plan. Prices are shown before you pay and may change with notice for future periods. We do not charge you automatically; you choose when to pay or renew. Fees already paid are non-refundable except where required by law. You may stop using the Services at any time; paid features continue until the end of the paid period.</p>
+          <p><strong>Pro trial.</strong> New businesses may receive a free Pro trial for a stated period, which may be extended by completing set steps. No payment details are needed. When the trial ends, the business moves to the Free plan: its data is kept, and features beyond the Free plan (such as additional recurring invoices) are paused, not deleted. One trial per business.</p>
+          <p id="referrals" className="scroll-mt-20"><strong>Referral programme.</strong> You may share your referral link. A referred business receives the stated extended trial. You earn the stated reward (currently Pro time and fee-free {L.product} Payments) only when the referred business signs up through your link, is a genuinely separate business, and meets the activity requirements shown in the app within the stated period. Referrals of your own company, related companies or accounts you control, and referrals obtained through spam, misleading claims or paid advertising on our brand name, do not qualify. Rewards have no cash value, cannot be transferred, may be capped, and may be withdrawn if obtained in breach of these Terms. We may change or end the programme with notice; rewards already earned are kept.</p>
         </S>
 
         <S id="use" title="7. Acceptable use">

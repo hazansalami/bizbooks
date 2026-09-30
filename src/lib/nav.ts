@@ -1,5 +1,5 @@
 import {
-  BadgeCent, CalendarClock, FileSignature, FileText, Home, Landmark, LifeBuoy, LineChart, Receipt, Repeat, Settings, ShoppingCart, Users, UsersRound, Wallet,
+  BadgeCent, CalendarClock, Gift, FileSignature, FileText, Home, Landmark, LifeBuoy, LineChart, Receipt, Repeat, Settings, ShoppingCart, Users, UsersRound, Wallet,
 } from "lucide-react";
 
 export type Item = { href: string; label: string; icon: typeof Home; exact?: boolean; match?: string[] };
@@ -40,7 +40,7 @@ export const NAV_GROUPS: { title?: string; icon?: typeof Home; items: Item[] }[]
       { href: "/app/advisors", label: "Advisors", icon: LifeBuoy },
     ],
   },
-  { items: [{ href: "/app/settings", label: "Settings", icon: Settings }] },
+  { items: [{ href: "/app/refer", label: "Refer & earn", icon: Gift }, { href: "/app/settings", label: "Settings", icon: Settings }] },
 ];
 
 export const NAV = NAV_GROUPS.flatMap((g) => g.items);

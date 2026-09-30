@@ -35,7 +35,10 @@ export async function signup(_: FormState, form: FormData): Promise<FormState> {
     return { errors: { email: "There's already an account with this email. Log in instead." }, values };
   }
   const user = await db.user.create({
-    data: { email: d.email, fullName: d.fullName, passwordHash: await bcrypt.hash(d.password, 10), termsAcceptedAt: new Date(), termsVersion: TERMS_VERSION },
+    data: {
+      email: d.email, fullName: d.fullName, passwordHash: await bcrypt.hash(d.password, 10), termsAcceptedAt: new Date(), termsVersion: TERMS_VERSION,
+      signupRef: String(form.get("ref") ?? "").slice(0, 40) || null,
+    },
   });
   await createSession({ userId: user.id });
   redirect("/onboarding");

@@ -24,7 +24,7 @@ export default async function AdminBusiness({ params }: { params: Promise<{ id: 
   });
   if (!b) notFound();
   const now = new Date();
-  const [customers, employees, expenses, payRuns, sent, invoiced, paid, recent, subs, feedback, log, schedules, platformPays] = await inSequence([
+  const [customers, employees, expenses, payRuns, sent, invoiced, paid, recent, subs, feedback, log, schedules, platformPays, referrals] = await inSequence([
     () => db.customer.count({ where: { businessId: id } }),
     () => db.employee.count({ where: { businessId: id } }),
     () => db.expense.count({ where: { businessId: id } }),
@@ -38,6 +38,7 @@ export default async function AdminBusiness({ params }: { params: Promise<{ id: 
     () => db.adminAction.findMany({ where: { businessId: id }, orderBy: { createdAt: "desc" }, take: 20 }),
     () => db.recurringSchedule.count({ where: { businessId: id, status: "ACTIVE" } }),
     () => db.payment.findMany({ where: { businessId: id, viaPlatform: true }, select: { amount: true, platformFee: true } }),
+    () => db.referral.findMany({ where: { OR: [{ referrerId: id }, { referredId: id }] }, include: { referrer: { select: { id: true, name: true } }, referred: { select: { id: true, name: true } } }, orderBy: { createdAt: "desc" } }),
   ] as const);
   const risks = risksFor(b, sent, now);
   const pro = isPro(b, now);
@@ -104,6 +105,25 @@ export default async function AdminBusiness({ params }: { params: Promise<{ id: 
           )}
         </div>
         <p className="mt-2 text-xs text-muted">Granted time is added on top of any time already paid. Every change is logged below.</p>
+      </section>
+
+      <section className="rounded-2xl border border-line bg-paper p-4 sm:p-5">
+        <h2 className="text-lg">Trial and referrals</h2>
+        <p className="mt-1 text-sm text-muted">
+          {b.trialStartedAt ? `Trial started ${formatDate(b.trialStartedAt)}, ${b.trialEndsAt ? `ends ${formatDate(b.trialEndsAt)}` : ""} · bonuses: ${b.trialBonuses.length ? b.trialBonuses.join(", ").toLowerCase().replace(/_/g, " ") : "none yet"}` : "Joined before trials"}
+          {" · "}code <span className="num text-ink">{b.referralCode ?? "—"}</span>
+          {b.feeFreeBonus > 0 && ` · ${b.feeFreeBonus} fee-free payments banked`}
+        </p>
+        {referrals.length > 0 ? (
+          <ul className="mt-2 divide-y divide-line text-sm">
+            {referrals.map((r) => (
+              <li key={r.id} className="flex flex-wrap justify-between gap-2 py-2">
+                <span>{r.referrerId === b.id ? <>Referred <Link href={`/admin/businesses/${r.referred.id}`} className="font-semibold hover:underline">{r.referred.name}</Link></> : <>Referred by <Link href={`/admin/businesses/${r.referrer.id}`} className="font-semibold hover:underline">{r.referrer.name}</Link></>}{r.reason ? <span className="text-muted"> · {r.reason}</span> : null}</span>
+                <span className="text-muted">{r.status.toLowerCase()}{r.status === "QUALIFIED" && r.referrerId === b.id ? ` · +${r.rewardMonths || "lifetime"}${r.rewardMonths ? " months" : ""}` : ""}</span>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="mt-2 text-sm text-muted">No referrals yet.</p>}
       </section>
 
       {b.paymentAccount && (

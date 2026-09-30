@@ -1,3 +1,4 @@
+import { checkReferral } from "@/lib/growth";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CheckCircle2, CircleAlert } from "lucide-react";
@@ -41,6 +42,7 @@ export default async function PublicInvoice({ params, searchParams }: Props) {
   const viewer = await getCurrentUser();
   if (!inv.viewedAt && viewer?.id !== inv.business.ownerId) {
     await db.invoice.update({ where: { id: inv.id }, data: { viewedAt: new Date(), events: { create: { type: "VIEWED" } } } });
+    if (inv.business.referredById) await checkReferral(inv.businessId);
   }
 
   const due = balanceDue(inv);

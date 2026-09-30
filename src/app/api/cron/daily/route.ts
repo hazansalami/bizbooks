@@ -1,10 +1,12 @@
+import { pauseBeyondFree } from "@/lib/growth";
+import { runReferralPrompts, runTrialEmails, sweepReferrals, trialEndedEmail } from "@/lib/growth-emails";
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { runSchedule } from "@/lib/recurring";
 import { runRecurringExpense } from "@/lib/recurring-expenses";
 import { runNurture } from "@/lib/nurture";
 import { emailInvoice, loadFullInvoice } from "@/lib/invoices";
-import { isPro } from "@/lib/plan";
+import { isPro, isTrial } from "@/lib/plan";
 import { layout, sendEmail } from "@/lib/email";
 import { balanceDue, naira } from "@/lib/money";
 import { siteUrl } from "@/lib/site-url";
@@ -87,11 +89,17 @@ export async function GET(request: NextRequest) {
   for (const b of pros) {
     const left = daysBetween(now, b.proUntil!);
     const noticedToday = b.renewalNoticeAt && b.renewalNoticeAt >= today;
-    if (b.proUntil!.getTime() + RENEWAL_GRACE_DAYS * 86400000 < now.getTime()) {
+    // Trials end on the day; paid plans get a grace period. Either way extras pause, nothing is deleted.
+    const trial = isTrial(b);
+    if (trial ? b.proUntil! < now : b.proUntil!.getTime() + RENEWAL_GRACE_DAYS * 86400000 < now.getTime()) {
       await db.business.update({ where: { id: b.id }, data: { plan: "FREE", cancelAtEnd: false } });
+      const paused = await pauseBeyondFree(b.id);
+      if (trial) await trialEndedEmail(b.id, paused);
       out.downgraded++;
       continue;
     }
+    // Trials get their own emails (lib/growth-emails.ts).
+    if (trial) continue;
     if (b.cancelAtEnd || noticedToday || (b.pausedUntil && b.pausedUntil > now) || ![7, 1, 0].includes(left)) continue;
     const { html, text } = layout({
       heading: left > 0 ? `Your BizBooks Pro ends in ${left} day${left > 1 ? "s" : ""}` : "Your BizBooks Pro ends today",
@@ -141,7 +149,18 @@ export async function GET(request: NextRequest) {
     out.nudges++;
   }
 
-  // 5. Calculator lead nurture emails (lib/nurture.ts).
+  // 5. Growth: trial emails, the one-time referral ask, and referral qualification.
+  const growth = { trialEmails: 0, referralPrompts: 0, referralsQualified: 0 };
+  try {
+    growth.trialEmails = await runTrialEmails(now);
+    growth.referralPrompts = await runReferralPrompts(now);
+    growth.referralsQualified = await sweepReferrals();
+  } catch (e) {
+    out.errors++;
+    console.error("growth", e);
+  }
+
+  // 6. Calculator lead nurture emails (lib/nurture.ts).
   let nurture = { sent: 0, converted: 0, completed: 0 };
   try {
     nurture = await runNurture(now);
@@ -150,5 +169,5 @@ export async function GET(request: NextRequest) {
     console.error("nurture", e);
   }
 
-  return NextResponse.json({ ok: true, ...out, nurture });
+  return NextResponse.json({ ok: true, ...out, growth, nurture });
 }

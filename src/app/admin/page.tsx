@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { inSequence, loadBusinessRows } from "@/lib/admin";
 import { setAdvisorStatus } from "@/app/actions/admin";
 import { adminReviewPaymentAccount } from "@/app/actions/payments";
+import { adminReferralDecision } from "@/app/actions/referrals";
 import { ColumnChart } from "@/components/charts";
 import { Badge } from "@/components/ui";
 import { isPro } from "@/lib/plan";
@@ -25,6 +26,7 @@ export default async function AdminOverview() {
     rows, signups7, signups30, active7, pros, paidAll, paid30, proPayments,
     inv30, invAll, quotes30, payGroups, payroll30, employees, leadsAll, leads30, leadsConverted,
     advisor, feedback, actions, weeklyUsers, weeklyInvoices, imported, platform30, payAccounts, toReview,
+    refStatus, refs30, recentRefs, trialPayers,
   ] = await inSequence([
     () => loadBusinessRows(now),
     () => db.user.count({ where: { createdAt: { gte: d7 } } }),
@@ -52,7 +54,14 @@ export default async function AdminOverview() {
     () => db.payment.findMany({ where: { viaPlatform: true, paidAt: { gte: d30 } }, select: { amount: true, platformFee: true } }),
     () => db.paymentAccount.groupBy({ by: ["status"], _count: { _all: true } }),
     () => db.paymentAccount.findMany({ where: { status: "PENDING_REVIEW" }, orderBy: { updatedAt: "asc" }, take: 20, include: { business: { select: { id: true, name: true, legalName: true, rcNumber: true } } } }),
+    () => db.referral.groupBy({ by: ["status"], _count: { _all: true } }),
+    () => db.referral.count({ where: { status: "QUALIFIED", qualifiedAt: { gte: d30 } } }),
+    () => db.referral.findMany({ orderBy: { createdAt: "desc" }, take: 12, include: { referrer: { select: { id: true, name: true } }, referred: { select: { id: true, name: true } } } }),
+    () => db.platformPayment.findMany({ where: { status: "PAID", business: { trialStartedAt: { not: null } } }, distinct: ["businessId"], select: { businessId: true } }),
   ] as const);
+  const refBy = (st: string) => refStatus.find((g) => g.status === st)?._count._all ?? 0;
+  const trialing = rows.filter((r) => r.trialEndsAt && r.pro && r.proUntil && r.proUntil.getTime() <= r.trialEndsAt.getTime());
+  const everTrialed = rows.filter((r) => r.trialStartedAt).length;
   const platformVolume = platform30.reduce((s, p) => s + p.amount, 0);
   const platformFees = platform30.reduce((s, p) => s + p.platformFee, 0);
   const accountsBy = (st: string) => payAccounts.find((g) => g.status === st)?._count._all ?? 0;
@@ -101,6 +110,13 @@ export default async function AdminOverview() {
         <Kpi label="Cancelling / paused" value={`${pros.filter((b) => b.cancelAtEnd && isPro(b, now)).length} / ${pros.filter((b) => b.pausedUntil && b.pausedUntil > now).length}`} hint="Save them before renewal" />
       </Section>
 
+      <Section title="Growth">
+        <Kpi label="On a Pro trial" value={trialing.length} hint={`${everTrialed} have started a trial`} tone="brand" />
+        <Kpi label="Trial → paid" value={trialPayers.length} hint={`${pct(trialPayers.length, everTrialed)} of trials have paid`} />
+        <Kpi label="Referrals qualified" value={refs30} hint={`last 30 days · ${refBy("QUALIFIED")} all time`} />
+        <Kpi label="Referrals pending" value={refBy("PENDING")} hint={`${refBy("REJECTED")} rejected · ${refBy("EXPIRED")} expired`} />
+      </Section>
+
       <Section title="BizBooks Payments, last 30 days">
         <Kpi label="Paid through BizBooks" value={platform30.length} hint={`${nairaShort(platformVolume)} settled to businesses`} tone="brand" />
         <Kpi label="Fees earned" value={naira(platformFees)} hint="₦500 per payment, VAT inclusive" />
@@ -129,6 +145,8 @@ export default async function AdminOverview() {
       </div>
 
       {toReview.length > 0 && <Panel title="Payout accounts to check"><PaymentReviews accounts={toReview} /></Panel>}
+
+      {recentRefs.length > 0 && <Panel title="Recent referrals"><ReferralList referrals={recentRefs} /></Panel>}
 
       <Panel title="At risk" action={<Link href="/admin/businesses?risk=1" className="text-sm font-semibold text-brand hover:underline">See all</Link>}>
         {risky.length === 0 ? <p className="text-muted">Nobody at risk right now.</p> : (
@@ -258,6 +276,34 @@ function PaymentReviews({ accounts }: { accounts: { id: string; bankName: string
             <button name="decision" value="approve" className="min-h-9 rounded-full bg-brand px-3 text-xs font-semibold text-white hover:bg-brand-deep">Approve</button>
             <button name="decision" value="reject" className="min-h-9 rounded-full border border-danger/40 px-3 text-xs font-semibold text-danger hover:bg-danger-wash">Reject</button>
           </form>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Recent referrals, with overrides for the cases the automatic rules get wrong. */
+function ReferralList({ referrals }: { referrals: { id: string; status: string; reason: string | null; source: string; createdAt: Date; referrer: { id: string; name: string }; referred: { id: string; name: string } }[] }) {
+  return (
+    <ul className="divide-y divide-line text-sm">
+      {referrals.map((r) => (
+        <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+          <span className="min-w-0">
+            <Link href={`/admin/businesses/${r.referrer.id}`} className="font-semibold hover:underline">{r.referrer.name}</Link>
+            {" → "}
+            <Link href={`/admin/businesses/${r.referred.id}`} className="hover:underline">{r.referred.name}</Link>
+            <span className="text-muted"> · {r.source === "INVOICE" ? "invoice link" : "shared link"} · {timeAgo(r.createdAt)}{r.reason ? ` · ${r.reason}` : ""}</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <Badge tone={r.status === "QUALIFIED" ? "brand" : r.status === "REJECTED" ? "danger" : r.status === "PENDING" ? "sun" : "neutral"}>{r.status.toLowerCase()}</Badge>
+            {(r.status === "PENDING" || r.status === "REJECTED") && (
+              <form action={adminReferralDecision} className="flex gap-1">
+                <input type="hidden" name="id" value={r.id} />
+                <button name="decision" value="approve" className="min-h-8 rounded-full border border-line-strong px-2.5 text-xs font-semibold hover:border-ink">Approve</button>
+                {r.status === "PENDING" && <button name="decision" value="reject" className="min-h-8 rounded-full border border-danger/40 px-2.5 text-xs font-semibold text-danger hover:bg-danger-wash">Reject</button>}
+              </form>
+            )}
+          </span>
         </li>
       ))}
     </ul>

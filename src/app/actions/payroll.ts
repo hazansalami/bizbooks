@@ -1,5 +1,7 @@
 "use server";
 
+import { grantTrialBonus } from "@/lib/growth";
+
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
@@ -139,6 +141,7 @@ export async function markPayRunPaid(form: FormData) {
     }),
     db.payRun.update({ where: { id: run.id }, data: { status: "PAID", paidAt: new Date() } }),
   ]);
+  await grantTrialBonus(business.id, "PAYROLL_OR_IMPORT");
   revalidatePath("/app/payroll");
   revalidatePath(`/app/payroll/runs/${run.id}`);
 }

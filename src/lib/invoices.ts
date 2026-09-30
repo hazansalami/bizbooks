@@ -1,4 +1,5 @@
 import "server-only";
+import { grantTrialBonus } from "./growth";
 import { db } from "./db";
 import { Prisma } from "@/generated/prisma/client";
 import { balanceDue, computeTotals, money, round2, type LineInput } from "./money";
@@ -251,6 +252,7 @@ export async function emailInvoice(inv: FullInvoice, kind: "send" | "reminder" =
           events: { create: { type: "SENT", note } },
         },
   });
+  if (kind === "send" && inv.kind === "INVOICE") await grantTrialBonus(inv.businessId, "FIRST_INVOICE");
   return { ok: true, to, error: undefined as string | undefined };
 }
 
@@ -261,6 +263,7 @@ export async function markSent(invoiceId: string, note: string) {
     where: { id: invoiceId },
     data: { sentAt: inv.sentAt ?? new Date(), status: inv.status === "DRAFT" ? "SENT" : inv.status, events: { create: { type: "SENT", note } } },
   });
+  if (inv.kind === "INVOICE") await grantTrialBonus(inv.businessId, "FIRST_INVOICE");
 }
 
 export function defaultDueDate(issue: Date, termsDays: number) {

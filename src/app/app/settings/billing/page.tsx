@@ -4,7 +4,7 @@ import { requireBusiness } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { PLANS } from "@/lib/constants";
 import { naira } from "@/lib/money";
-import { inGracePeriod, isPro, renewalPrice } from "@/lib/plan";
+import { inGracePeriod, isPro, isTrial, renewalPrice } from "@/lib/plan";
 import { formatDate } from "@/lib/utils";
 import { resumeFromPause, startUpgrade, undoCancel } from "@/app/actions/billing";
 import { Badge, buttonClass, Notice, PageHeader, Panel } from "@/components/ui";
@@ -44,9 +44,9 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm text-muted">Current plan</p>
-            <p className="text-2xl font-bold">{pro ? "Pro" : paused ? "Pro (paused)" : "Free"}</p>
+            <p className="text-2xl font-bold">{pro ? (isTrial(b) ? "Pro trial" : "Pro") : paused ? "Pro (paused)" : "Free"}</p>
           </div>
-          {pro && !b.cancelAtEnd && <Badge tone={inGracePeriod(b) ? "sun" : "brand"}>{inGracePeriod(b) ? `Ended ${formatDate(b.proUntil)}` : `Paid until ${formatDate(b.proUntil)}`}</Badge>}
+          {pro && !b.cancelAtEnd && <Badge tone={inGracePeriod(b) ? "sun" : "brand"}>{inGracePeriod(b) ? `Ended ${formatDate(b.proUntil)}` : isTrial(b) ? `Free until ${formatDate(b.proUntil)}` : `Paid until ${formatDate(b.proUntil)}`}</Badge>}
           {pro && b.cancelAtEnd && <Badge tone="sun">Ends {formatDate(b.proUntil)}</Badge>}
           {paused && <Badge tone="sun">Paused until {formatDate(b.pausedUntil)}</Badge>}
         </div>

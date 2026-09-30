@@ -8,8 +8,8 @@ import { Badge } from "@/components/ui";
 import { requireBusiness } from "@/lib/auth";
 import { adminEmails } from "@/lib/admin";
 import { logout } from "@/app/actions/auth";
-import { isPro } from "@/lib/plan";
-import { initials } from "@/lib/utils";
+import { isPro, isTrial } from "@/lib/plan";
+import { daysBetween, initials } from "@/lib/utils";
 
 export const metadata: Metadata = { robots: { index: false } };
 
@@ -33,7 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between">
-            <Link href="/app/settings/billing"><Badge tone={pro ? "brand" : "neutral"}>{pro ? "Pro" : "Free plan"}</Badge></Link>
+            <Link href="/app/settings/billing"><Badge tone={pro ? "brand" : "neutral"}>{pro ? (isTrial(business) ? `Pro trial · ${Math.max(0, daysBetween(new Date(), business.proUntil!))}d` : "Pro") : "Free plan"}</Badge></Link>
             <InstallLink />
             {adminEmails().includes(user.email.toLowerCase()) && <Link href="/admin" className="text-xs font-semibold text-brand hover:underline">Admin</Link>}
             <form action={logout}>

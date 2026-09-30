@@ -1,4 +1,5 @@
 import "server-only";
+import { checkReferral } from "./growth";
 import { db } from "./db";
 import { decryptSecret } from "./crypto";
 import { newReference, startCheckout, verifyPayment, type Provider } from "./gateways";
@@ -109,6 +110,7 @@ export async function settlePlatformReference(invoiceId: string, reference: stri
         },
       })] : []),
     ]);
+    if (inv.business.referredById) await checkReferral(inv.businessId);
     const settles = round2(v.amount - fees);
     await notifyPaid(inv, v.amount, r.fullyPaid, `${naira(settles)} settles straight to your ${account.bankName} account ending ${account.accountNumber.slice(-4)} on Paystack's next settlement (fees ${naira(fees)}).`);
   }

@@ -1,3 +1,4 @@
+import { TrialCard } from "@/components/trial-card";
 import Link from "next/link";
 import { ArrowDownLeft, ArrowRight, ArrowUpRight, Check, ChevronRight, CircleAlert, FilePlus2, FileSignature, Landmark, PartyPopper, Receipt, Repeat, UsersRound } from "lucide-react";
 import { requireBusiness } from "@/lib/auth";
@@ -136,6 +137,8 @@ export default async function Overview({ searchParams }: { searchParams: Promise
           </Link>
         ))}
       </div>
+
+      <TrialCard business={business} />
 
       {inGracePeriod(business) && (
         <Panel className="flex flex-wrap items-center justify-between gap-3 border-sun bg-sun-wash p-4">
