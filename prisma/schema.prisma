@@ -136,7 +136,10 @@ model Business {
   referralReceived Referral? @relation("ReferralReferred")
   // Fee-free BizBooks Payments earned before a payment account exists; added when it's switched on.
   feeFreeBonus    Int       @default(0)
-  // Pro businesses can opt in to the "Sent with BizBooks" referral line on their invoices.
+  // End of the Pro time actually paid for. Free Pro (trial, referral rewards, admin grants) extends proUntil
+  // but not this. BizBooks branding on invoices is removed only while paid-for Pro is running.
+  paidUntil       DateTime?
+  // Paying Pro businesses can opt back in to the "Sent with BizBooks" referral line on their invoices.
   showReferralFooter Boolean @default(false)
   referralPromptedAt DateTime?
 }

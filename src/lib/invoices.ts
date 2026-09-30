@@ -8,7 +8,7 @@ import { paymentsEnabled } from "./platform-payments";
 import { layout, sendEmail, escapeHtml as esc } from "./email";
 import { siteUrl } from "./site-url";
 import { addDays, formatDate, greetingName, randomToken } from "./utils";
-import { isPro } from "./plan";
+import { isPro, showsBranding } from "./plan";
 import { APP_NAME } from "./constants";
 
 type Tx = Prisma.TransactionClient;
@@ -236,7 +236,7 @@ export async function emailInvoice(inv: FullInvoice, kind: "send" | "reminder" =
       : { label: "View invoice", href: publicInvoiceUrl(inv.publicToken) },
     after,
     color: isPro(inv.business) ? inv.business.brandColor : undefined,
-    footer: isPro(inv.business) ? inv.business.name : `Sent by ${esc(inv.business.name)} with ${APP_NAME}`,
+    footer: showsBranding(inv.business) ? `Sent by ${esc(inv.business.name)} with ${APP_NAME}` : inv.business.name,
   });
   const r = await sendEmail({ to, cc: o.cc, subject, html, text, replyTo: inv.business.email, fromName: inv.business.name });
   if (!r.ok) return r;

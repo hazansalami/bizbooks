@@ -12,9 +12,11 @@ export async function activatePro(platformPaymentId: string) {
     const now = new Date();
     // Renewing early adds to the time left; renewing late starts from today.
     const base = b.proUntil && b.proUntil > now ? b.proUntil : now;
+    const proUntil = addMonths(base, p.months);
+    // Paid time runs to the new end date; that's what turns the BizBooks line off their invoices.
     await tx.business.update({
       where: { id: b.id },
-      data: { plan: "PRO", proUntil: addMonths(base, p.months), cancelAtEnd: false, renewalNoticeAt: null },
+      data: { plan: "PRO", proUntil, paidUntil: proUntil, cancelAtEnd: false, renewalNoticeAt: null },
     });
   });
 }
