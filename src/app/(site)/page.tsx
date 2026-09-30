@@ -21,7 +21,7 @@ const faqs = [
   },
   {
     q: `Does ${APP_NAME} hold our money?`,
-    a: `No. Clients pay into your company's own bank account, or through your own Paystack or Flutterwave account. ${APP_NAME} creates the payment link and confirms the result, but never receives, holds or moves your money.`,
+    a: `No. With ${APP_NAME} Payments, clients pay through Paystack and the money settles straight to your company's bank account; our ₦500 fee is deducted by Paystack, not held by us. You can also connect your own Paystack or Flutterwave account, or take bank transfers. Either way, ${APP_NAME} never holds or moves your money.`,
   },
   {
     q: "How is BizBooks different from Zoho Books?",

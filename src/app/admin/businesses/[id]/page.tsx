@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { inSequence, planLabel, risksFor } from "@/lib/admin";
 import { addNote, clearCancel, endPause, grantPro, revokePro } from "@/app/actions/admin";
+import { adminReviewPaymentAccount } from "@/app/actions/payments";
 import { Badge } from "@/components/ui";
 import { isPro } from "@/lib/plan";
 import { money, naira, nairaShort } from "@/lib/money";
@@ -19,11 +20,11 @@ export default async function AdminBusiness({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const b = await db.business.findUnique({
     where: { id },
-    include: { owner: { select: { email: true, fullName: true, phone: true, createdAt: true, termsAcceptedAt: true } }, gateways: { select: { provider: true, enabled: true } }, bankAccounts: { select: { id: true } } },
+    include: { owner: { select: { email: true, fullName: true, phone: true, createdAt: true, termsAcceptedAt: true } }, gateways: { select: { provider: true, enabled: true } }, bankAccounts: { select: { id: true } }, paymentAccount: true },
   });
   if (!b) notFound();
   const now = new Date();
-  const [customers, employees, expenses, payRuns, sent, invoiced, paid, recent, subs, feedback, log, schedules] = await inSequence([
+  const [customers, employees, expenses, payRuns, sent, invoiced, paid, recent, subs, feedback, log, schedules, platformPays] = await inSequence([
     () => db.customer.count({ where: { businessId: id } }),
     () => db.employee.count({ where: { businessId: id } }),
     () => db.expense.count({ where: { businessId: id } }),
@@ -36,6 +37,7 @@ export default async function AdminBusiness({ params }: { params: Promise<{ id: 
     () => db.cancellationFeedback.findMany({ where: { businessId: id }, orderBy: { createdAt: "desc" } }),
     () => db.adminAction.findMany({ where: { businessId: id }, orderBy: { createdAt: "desc" }, take: 20 }),
     () => db.recurringSchedule.count({ where: { businessId: id, status: "ACTIVE" } }),
+    () => db.payment.findMany({ where: { businessId: id, viaPlatform: true }, select: { amount: true, platformFee: true } }),
   ] as const);
   const risks = risksFor(b, sent, now);
   const pro = isPro(b, now);
@@ -103,6 +105,32 @@ export default async function AdminBusiness({ params }: { params: Promise<{ id: 
         </div>
         <p className="mt-2 text-xs text-muted">Granted time is added on top of any time already paid. Every change is logged below.</p>
       </section>
+
+      {b.paymentAccount && (
+        <section className="rounded-2xl border border-line bg-paper p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg">BizBooks Payments</h2>
+            <Badge tone={b.paymentAccount.status === "ACTIVE" ? "brand" : b.paymentAccount.status === "PENDING_REVIEW" ? "sun" : b.paymentAccount.status === "SUSPENDED" ? "danger" : "neutral"}>{b.paymentAccount.status.replace("_", " ").toLowerCase()}</Badge>
+          </div>
+          <p className="mt-1 text-sm">
+            Settles to <strong>{b.paymentAccount.accountName}</strong> · {b.paymentAccount.bankName} ••{b.paymentAccount.accountNumber.slice(-4)}
+            {b.paymentAccount.subaccountCode && <span className="text-muted"> · {b.paymentAccount.subaccountCode}</span>}
+          </p>
+          <p className="text-sm text-muted">
+            {platformPays.length} payments · {nairaShort(platformPays.reduce((s, p) => s + p.amount, 0))} settled · {naira(platformPays.reduce((s, p) => s + p.platformFee, 0))} fees earned · {b.paymentAccount.feeFreeLeft} fee-free left
+          </p>
+          {b.paymentAccount.reviewNote && <p className="mt-1 text-sm text-sun-ink">{b.paymentAccount.reviewNote}</p>}
+          <form action={adminReviewPaymentAccount} className="mt-3 flex flex-wrap items-center gap-2">
+            <input type="hidden" name="id" value={b.paymentAccount.id} />
+            {b.paymentAccount.status !== "ACTIVE" && <button name="decision" value="approve" className="min-h-10 rounded-full bg-brand px-4 text-sm font-semibold text-white hover:bg-brand-deep">Approve / reactivate</button>}
+            {b.paymentAccount.status === "PENDING_REVIEW" && <button name="decision" value="reject" className="min-h-10 rounded-full border border-danger/40 px-4 text-sm font-semibold text-danger hover:bg-danger-wash">Reject</button>}
+            {b.paymentAccount.status === "ACTIVE" && <button name="decision" value="suspend" className="min-h-10 rounded-full border border-danger/40 px-4 text-sm font-semibold text-danger hover:bg-danger-wash">Suspend</button>}
+            <input name="count" inputMode="numeric" defaultValue="5" aria-label="Fee-free payments to add" className="min-h-10 w-16 rounded-xl border border-line-strong bg-paper px-2 text-sm" />
+            <button name="decision" value="credits" className="min-h-10 rounded-full border border-line-strong px-4 text-sm font-semibold hover:border-ink">Add fee-free payments</button>
+            <input name="note" placeholder="Reason (for reject/suspend, emailed)" className="min-h-10 min-w-56 flex-1 rounded-xl border border-line-strong bg-paper px-3 text-sm" />
+          </form>
+        </section>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-2">
         <section className="rounded-2xl border border-line bg-paper p-4 sm:p-5">

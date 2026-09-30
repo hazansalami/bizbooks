@@ -3,7 +3,7 @@
   PLACEHOLDERS IN BRACKETS MUST BE FILLED IN BEFORE LAUNCH, and both documents should be
   reviewed by a Nigerian lawyer. Bump TERMS_VERSION whenever the Terms or Privacy Policy change.
 */
-export const TERMS_VERSION = "2026-09-28";
+export const TERMS_VERSION = "2026-09-30";
 
 export const LEGAL = {
   product: "BizBooks",

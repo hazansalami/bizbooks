@@ -15,7 +15,8 @@ Prices in Nigerian naira (NGN). No automatic charges: Pro is paid monthly or yea
 - Wave: free, but invoices and reminders can't be sent from Wave outside the US and Canada. See /compare/wave
 
 ## Payment processing
-- BizBooks adds no fees. Online payments use the customer's own Paystack or Flutterwave account at their standard rates.
+- BizBooks Payments (optional): ₦500 flat per successful payment, VAT inclusive; no fee on payments under ₦2,500; first 5 payments free. Paystack's standard fee also applies. Money settles directly to the business's bank account via Paystack.
+- Own gateway: connect your own Paystack or Flutterwave account and BizBooks adds no fees.
 
 ## Advisors (done-for-you services, starting prices per month)
 - Monthly bookkeeping: from ₦150,000

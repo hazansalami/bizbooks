@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { inSequence, loadBusinessRows } from "@/lib/admin";
 import { setAdvisorStatus } from "@/app/actions/admin";
+import { adminReviewPaymentAccount } from "@/app/actions/payments";
 import { ColumnChart } from "@/components/charts";
 import { Badge } from "@/components/ui";
 import { isPro } from "@/lib/plan";
@@ -23,7 +24,7 @@ export default async function AdminOverview() {
   const [
     rows, signups7, signups30, active7, pros, paidAll, paid30, proPayments,
     inv30, invAll, quotes30, payGroups, payroll30, employees, leadsAll, leads30, leadsConverted,
-    advisor, feedback, actions, weeklyUsers, weeklyInvoices, imported,
+    advisor, feedback, actions, weeklyUsers, weeklyInvoices, imported, platform30, payAccounts, toReview,
   ] = await inSequence([
     () => loadBusinessRows(now),
     () => db.user.count({ where: { createdAt: { gte: d7 } } }),
@@ -48,7 +49,13 @@ export default async function AdminOverview() {
     () => db.user.findMany({ where: { createdAt: { gte: weeksAgo } }, select: { createdAt: true } }),
     () => db.invoice.findMany({ where: { kind: "INVOICE", importSource: null, createdAt: { gte: weeksAgo } }, select: { createdAt: true } }),
     () => db.invoice.count({ where: { importSource: { not: null } } }),
+    () => db.payment.findMany({ where: { viaPlatform: true, paidAt: { gte: d30 } }, select: { amount: true, platformFee: true } }),
+    () => db.paymentAccount.groupBy({ by: ["status"], _count: { _all: true } }),
+    () => db.paymentAccount.findMany({ where: { status: "PENDING_REVIEW" }, orderBy: { updatedAt: "asc" }, take: 20, include: { business: { select: { id: true, name: true, legalName: true, rcNumber: true } } } }),
   ] as const);
+  const platformVolume = platform30.reduce((s, p) => s + p.amount, 0);
+  const platformFees = platform30.reduce((s, p) => s + p.platformFee, 0);
+  const accountsBy = (st: string) => payAccounts.find((g) => g.status === st)?._count._all ?? 0;
 
   const total = rows.length;
   const onboarded = rows.filter((r) => r.onboardedAt).length;
@@ -94,6 +101,13 @@ export default async function AdminOverview() {
         <Kpi label="Cancelling / paused" value={`${pros.filter((b) => b.cancelAtEnd && isPro(b, now)).length} / ${pros.filter((b) => b.pausedUntil && b.pausedUntil > now).length}`} hint="Save them before renewal" />
       </Section>
 
+      <Section title="BizBooks Payments, last 30 days">
+        <Kpi label="Paid through BizBooks" value={platform30.length} hint={`${nairaShort(platformVolume)} settled to businesses`} tone="brand" />
+        <Kpi label="Fees earned" value={naira(platformFees)} hint="₦500 per payment, VAT inclusive" />
+        <Kpi label="Businesses on it" value={accountsBy("ACTIVE")} hint={`${accountsBy("DISABLED")} turned off · ${accountsBy("SUSPENDED")} suspended`} />
+        <Kpi label="Payout accounts to check" value={toReview.length} hint="Names that don't match the business" tone={toReview.length ? "danger" : undefined} />
+      </Section>
+
       <Section title="Activity on the platform, last 30 days">
         <Kpi label="Invoices created" value={inv30.length} hint={`${nairaShort(invoiced30)} invoiced · ${invAll} all time`} />
         <Kpi label="Payments recorded" value={count(payGroups)} hint={`${nairaShort(sum(payGroups))} received by businesses`} />
@@ -113,6 +127,8 @@ export default async function AdminOverview() {
           <ColumnChart unit="count" height={200} caption="Invoices created per week, last 12 weeks" rows={weeks.map((w, i) => ({ label: label(w), invoices: invs[i] }))} series={[{ key: "invoices", label: "Invoices", color: VIZ.net }]} />
         </Panel>
       </div>
+
+      {toReview.length > 0 && <Panel title="Payout accounts to check"><PaymentReviews accounts={toReview} /></Panel>}
 
       <Panel title="At risk" action={<Link href="/admin/businesses?risk=1" className="text-sm font-semibold text-brand hover:underline">See all</Link>}>
         {risky.length === 0 ? <p className="text-muted">Nobody at risk right now.</p> : (
@@ -220,5 +236,30 @@ function Panel({ title, action, children }: { title: string; action?: React.Reac
       <div className="mb-2 flex items-center justify-between gap-2"><h2 className="text-lg">{title}</h2>{action}</div>
       {children}
     </section>
+  );
+}
+
+/** Payout accounts waiting for a person to check them (name didn't match the business). */
+function PaymentReviews({ accounts }: { accounts: { id: string; bankName: string; accountNumber: string; accountName: string; reviewNote: string | null; createdAt: Date; pendingBankName: string | null; pendingAccountNumber: string | null; pendingAccountName: string | null; business: { id: string; name: string; legalName: string | null; rcNumber: string | null } }[] }) {
+  return (
+    <ul className="divide-y divide-line">
+      {accounts.map((a) => (
+        <li key={a.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
+          <div className="min-w-0 text-sm">
+            <Link href={`/admin/businesses/${a.business.id}`} className="font-semibold hover:underline">{a.business.name}</Link>
+            <span className="text-muted"> · {a.business.legalName ?? "no legal name"} · {a.business.rcNumber ? `RC/BN ${a.business.rcNumber}` : "no CAC number"}</span>
+            {a.pendingAccountNumber
+              ? <p>Change from {a.accountName} ({a.bankName} ••{a.accountNumber.slice(-4)}) to <strong>{a.pendingAccountName}</strong> · {a.pendingBankName} ••{a.pendingAccountNumber.slice(-4)}</p>
+              : <p>Bank says: <strong>{a.accountName}</strong> · {a.bankName} ••{a.accountNumber.slice(-4)}</p>}
+            {a.reviewNote && <p className="text-muted">{a.reviewNote} · {timeAgo(a.createdAt)}</p>}
+          </div>
+          <form action={adminReviewPaymentAccount} className="flex flex-wrap gap-1">
+            <input type="hidden" name="id" value={a.id} />
+            <button name="decision" value="approve" className="min-h-9 rounded-full bg-brand px-3 text-xs font-semibold text-white hover:bg-brand-deep">Approve</button>
+            <button name="decision" value="reject" className="min-h-9 rounded-full border border-danger/40 px-3 text-xs font-semibold text-danger hover:bg-danger-wash">Reject</button>
+          </form>
+        </li>
+      ))}
+    </ul>
   );
 }
