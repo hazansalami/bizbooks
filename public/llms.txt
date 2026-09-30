@@ -1,6 +1,6 @@
 # BizBooks
 
-> Accounting, invoicing, payroll and tax tracking for registered Nigerian companies (agencies, consultancies, IT and B2B service firms). A dashboard shows cash flow, profit, receivables and payables, and upcoming payroll and tax deadlines. Clients pay through the company's own Paystack or Flutterwave account or by bank transfer; BizBooks never holds customer money.
+> Accounting, invoicing, payroll and tax tracking for registered Nigerian companies (agencies, consultancies, IT and B2B service firms). A dashboard shows cash flow, profit, receivables and payables, and upcoming payroll and tax deadlines. Clients pay through BizBooks Payments (Paystack settles directly to the company's bank; ₦500 flat fee), the company's own Paystack or Flutterwave account, or bank transfer; BizBooks never holds customer money.
 
 ## Stay organized & tax-ready
 - Dashboard: cash flow, profit and loss (accrual), expense breakdown, net income by year, aged receivables and payables
@@ -12,7 +12,8 @@
 - Invoices with CAC/RC number, TIN, client PO number, 7.5% VAT and 2%/5%/10% WHT, amount in words
 - Quotes clients accept online, with optional deposits credited on the final invoice
 - Recurring invoices and automatic reminders
-- Online payments through the company's own Paystack or Flutterwave keys (encrypted)
+- BizBooks Payments: add a verified business bank account (no API keys); clients pay by card, transfer or USSD and Paystack settles straight to that account; ₦500 flat fee per payment
+- Or online payments through the company's own Paystack or Flutterwave keys (encrypted)
 
 ## Pay your team
 - Payroll for staff (PAYE, 8%/10% pension, NHF, rent relief) and contractors (withholding tax)

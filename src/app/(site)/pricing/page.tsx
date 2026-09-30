@@ -54,9 +54,10 @@ export default function Pricing() {
       <div className="mx-auto mt-14 max-w-3xl rounded-2xl bg-brand-wash p-6 text-brand-deep">
         <h2 className="text-lg">What about payment fees?</h2>
         <p className="mt-1">
-          {APP_NAME} adds nothing on top. Online payments go through your company's own Paystack or Flutterwave account at
-          their standard rates and settle into your bank as usual. Bank transfers straight to your account cost nothing extra.
-          Payroll is paid from your own bank, so there are no per-payslip charges either.
+          With <strong>{APP_NAME} Payments</strong>, clients pay by card, transfer or USSD and the money settles straight to your
+          bank. It costs a flat <strong>₦500 per payment</strong> (VAT included; free under ₦2,500, and your first 5 payments are free)
+          plus Paystack&apos;s standard fee. Prefer your own Paystack or Flutterwave account? Connect it and {APP_NAME} adds nothing on
+          top. Bank transfers and payroll cost nothing extra.
         </p>
       </div>
 

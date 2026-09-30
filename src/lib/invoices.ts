@@ -3,6 +3,7 @@ import { db } from "./db";
 import { Prisma } from "@/generated/prisma/client";
 import { balanceDue, computeTotals, money, round2, type LineInput } from "./money";
 import { GATEWAY_CURRENCIES } from "./currency";
+import { paymentsEnabled } from "./platform-payments";
 import { layout, sendEmail, escapeHtml as esc } from "./email";
 import { siteUrl } from "./site-url";
 import { addDays, formatDate, greetingName, randomToken } from "./utils";
@@ -89,7 +90,7 @@ export async function createInvoice(input: NewInvoice, tx?: Tx) {
  * (redirect and webhook often both arrive): the unique reference makes the second call a no-op.
  */
 /** amount is in the invoice's currency; exchangeRate (naira per unit) defaults to the invoice's own rate. */
-export async function applyPayment(invoiceId: string, p: { amount: number; method: string; reference?: string | null; paidAt?: Date; note?: string | null; exchangeRate?: number }) {
+export async function applyPayment(invoiceId: string, p: { amount: number; method: string; reference?: string | null; paidAt?: Date; note?: string | null; exchangeRate?: number; viaPlatform?: boolean; platformFee?: number; processorFee?: number }) {
   const amount = round2(p.amount);
   if (!(amount > 0)) return { ok: false as const, error: "Enter an amount above zero." };
   try {
@@ -101,6 +102,7 @@ export async function applyPayment(invoiceId: string, p: { amount: number; metho
         data: {
           businessId: inv.businessId, invoiceId, amount, method: p.method, reference: p.reference ?? null,
           exchangeRate: inv.currency === "NGN" ? 1 : p.exchangeRate && p.exchangeRate > 0 ? p.exchangeRate : inv.exchangeRate,
+          viaPlatform: p.viaPlatform ?? false, platformFee: round2(p.platformFee ?? 0), processorFee: round2(p.processorFee ?? 0),
           paidAt: p.paidAt ?? new Date(), note: p.note ?? null,
         },
       });
@@ -134,7 +136,7 @@ export async function refreshInvoicePaid(invoiceId: string) {
   await db.invoice.update({ where: { id: invoiceId }, data: { amountPaid, status, paidAt: status === "PAID" ? inv.paidAt ?? new Date() : null } });
 }
 
-const fullInclude = { business: { include: { bankAccounts: true, gateways: true } }, customer: true, items: { orderBy: { position: "asc" as const } } };
+const fullInclude = { business: { include: { bankAccounts: true, gateways: true, paymentAccount: true } }, customer: true, items: { orderBy: { position: "asc" as const } } };
 export type FullInvoice = Prisma.InvoiceGetPayload<{ include: typeof fullInclude }>;
 
 export async function loadFullInvoice(id: string) {
@@ -146,8 +148,14 @@ export function gatewayFor(inv: FullInvoice) {
   return inv.business.gateways.find((g) => g.enabled && (GATEWAY_CURRENCIES[g.provider] ?? ["NGN"]).includes(inv.currency));
 }
 
+/** BizBooks Payments is on for this business and can take this invoice (naira only). */
+export function platformReady(inv: FullInvoice) {
+  const a = inv.business.paymentAccount;
+  return paymentsEnabled() && inv.currency === "NGN" && a?.status === "ACTIVE" && !!a.subaccountCode;
+}
+
 export function canPayOnline(inv: FullInvoice) {
-  return inv.kind === "INVOICE" && !!gatewayFor(inv);
+  return inv.kind === "INVOICE" && (platformReady(inv) || !!gatewayFor(inv));
 }
 
 function bankLines(inv: FullInvoice) {

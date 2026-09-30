@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { invoiceIdFromReference, type Provider } from "@/lib/gateways";
-import { settleReference } from "@/lib/checkout";
+import { settlePlatformReference, settleReference } from "@/lib/checkout";
 
 // Where Paystack (?reference=) and Flutterwave (?tx_ref=) send the customer after checkout.
 export async function GET(request: NextRequest) {
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     back.searchParams.set("payment", "failed");
     return NextResponse.redirect(back);
   }
-  const r = await settleReference(inv.id, provider, reference);
+  const r = q.get("mode") === "platform" ? await settlePlatformReference(inv.id, reference) : await settleReference(inv.id, provider, reference);
   back.searchParams.set("payment", r.ok ? "success" : "pending");
   return NextResponse.redirect(back);
 }

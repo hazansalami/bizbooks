@@ -3,9 +3,9 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { round2 } from "./money";
 
 /*
-  Each business connects its OWN Paystack or Flutterwave account. Customers pay the business
-  directly; BizBooks only starts the checkout with the business's key and reads the result.
-  We never receive, hold or move customer money, so no payment licence is needed for this part.
+  "Own gateway" mode: a business connects its OWN Paystack or Flutterwave account. Customers pay the
+  business directly; BizBooks only starts the checkout with the business's key and reads the result.
+  The alternative, BizBooks Payments (Paystack split settlements), lives in platform-payments.ts.
 */
 
 export type Provider = "PAYSTACK" | "FLUTTERWAVE";

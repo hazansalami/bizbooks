@@ -59,8 +59,17 @@ export default function Terms() {
         </S>
 
         <S id="payments" title="4. Payments and third-party services">
-          <p>{L.product} is not a bank, payment service provider, switch, wallet or money transmitter, and <strong>never receives, holds or transfers your or your clients&rsquo; funds</strong>. Online payments are processed by third parties you choose and contract with directly (such as Paystack or Flutterwave) under their own terms, using credentials you provide. Salaries and other payments are made from your own bank account.</p>
-          <p>We are not responsible for the acts, omissions, fees, availability, security, settlements, reversals, chargebacks or failures of any bank, payment provider, email provider, hosting provider or other third party, or for any loss caused by them. You are responsible for keeping your gateway keys secure and for the transactions made with them.</p>
+          <p>{L.product} is not a bank, payment service provider, switch, wallet or money transmitter. <strong>We never hold, pool or transfer your or your clients&rsquo; funds.</strong> Online payments are processed and settled by licensed payment providers (such as Paystack or Flutterwave). Salaries and other payments are made from your own bank account.</p>
+          <p><strong>Your own gateway.</strong> If you connect your own Paystack or Flutterwave account, payments are processed under your own agreement with that provider, using credentials you provide, and land in your own gateway account.</p>
+          <p><strong>{L.product} Payments.</strong> If you turn on {L.product} Payments, your clients pay through a checkout provided by Paystack on {L.product}&rsquo;s Paystack account, and Paystack settles your share directly to the business bank account you nominate, on Paystack&rsquo;s settlement schedule. By turning it on you agree that:</p>
+          <ul>
+            <li>it is available only to registered businesses, and the settlement account must belong to the business. We verify account names with your bank through Paystack, may ask for further documents, and may share your business details with Paystack for verification and anti-money-laundering checks;</li>
+            <li>a flat processing fee (currently &#8358;500 per successful payment, VAT inclusive, with no fee on payments under &#8358;2,500) and Paystack&rsquo;s standard fees are deducted before settlement. Fees are shown before you turn the service on and may change with notice. Fee-free allowances and rewards have no cash value;</li>
+            <li>you are responsible for the goods and services you invoice for, and for refunds, disputes and chargebacks raised by your clients. Where Paystack reverses or charges back a payment, the amount and any related fees may be recovered from future settlements to you or otherwise from you;</li>
+            <li>we may pause or end {L.product} Payments for your business, or hold a change of settlement account for review, to prevent fraud, meet Paystack&rsquo;s or legal requirements, or where these Terms are breached. Clients can still pay you by bank transfer; and</li>
+            <li>Paystack&rsquo;s own terms and acceptable use policy also apply to payments made through the service.</li>
+          </ul>
+          <p>We are not responsible for the acts, omissions, fees, availability, security, settlements, reversals, chargebacks or failures of any bank, payment provider, email provider, hosting provider or other third party, or for any loss caused by them. You are responsible for keeping your gateway keys and account access secure, for your settlement details being correct, and for the transactions made with them.</p>
         </S>
 
         <S id="advisors" title="5. Advisory services">

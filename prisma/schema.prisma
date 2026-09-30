@@ -115,6 +115,7 @@ model Business {
   subscriptions PlatformPayment[]
   feedback      CancellationFeedback[]
   taxFilings    TaxFiling[]
+  paymentAccount PaymentAccount?
 }
 
 model BankAccount {
@@ -287,6 +288,11 @@ model Payment {
   reference  String?  @unique
   // Naira per 1 unit of the invoice currency on the day the money arrived. Amount is in the invoice currency.
   exchangeRate Float  @default(1)
+  // BizBooks Payments: paid through our Paystack split and settled straight to the business's bank.
+  viaPlatform  Boolean @default(false)
+  // Our processing fee and Paystack's fee for this payment, both deducted before settlement (naira).
+  platformFee  Float   @default(0)
+  processorFee Float   @default(0)
   paidAt     DateTime @default(now())
   note       String?
   createdAt  DateTime @default(now())
@@ -585,4 +591,37 @@ model AdminAction {
 
   @@index([businessId, createdAt])
   @@index([createdAt])
+}
+
+/**
+ * BizBooks Payments: a Paystack subaccount on BizBooks' own account. Clients pay through our checkout and
+ * Paystack settles the business's share straight to this bank account; BizBooks never holds the money.
+ */
+model PaymentAccount {
+  id             String    @id @default(cuid())
+  businessId     String    @unique
+  business       Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  bankCode       String
+  bankName       String
+  accountNumber  String
+  // Name returned by the bank for this account number; must match the business before we go live.
+  accountName    String
+  // Paystack subaccount code (ACCT_…). Null until approved.
+  subaccountCode String?   @unique
+  // PENDING_REVIEW | ACTIVE | SUSPENDED | DISABLED
+  status         String    @default("PENDING_REVIEW")
+  // A requested change of payout account that didn't match the business, held for review. The verified
+  // account above keeps its details (Paystack still settles there) until an admin approves the change.
+  pendingBankCode      String?
+  pendingBankName      String?
+  pendingAccountNumber String?
+  pendingAccountName   String?
+  reviewNote     String?
+  // Payments left with no BizBooks fee: a welcome allowance, topped up by rewards.
+  feeFreeLeft    Int       @default(5)
+  termsAcceptedAt DateTime
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status])
 }

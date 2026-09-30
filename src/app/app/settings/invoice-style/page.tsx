@@ -83,11 +83,11 @@ function Thumb({ inv, template }: { inv: FullInvoice; template: InvoiceTemplateI
 
 /** The business's latest invoice with several lines, or a realistic sample built from its details. */
 async function sampleInvoice(businessId: string): Promise<FullInvoice> {
-  const business = await db.business.findUniqueOrThrow({ where: { id: businessId }, include: { bankAccounts: true, gateways: true } });
+  const business = await db.business.findUniqueOrThrow({ where: { id: businessId }, include: { bankAccounts: true, gateways: true, paymentAccount: true } });
   const latest = await db.invoice.findFirst({
     where: { businessId, kind: "INVOICE", status: { not: "VOID" }, items: { some: {} } },
     orderBy: { createdAt: "desc" },
-    include: { business: { include: { bankAccounts: true, gateways: true } }, customer: true, items: { orderBy: { position: "asc" } } },
+    include: { business: { include: { bankAccounts: true, gateways: true, paymentAccount: true } }, customer: true, items: { orderBy: { position: "asc" } } },
   });
   if (latest && latest.items.length >= 2) return latest;
 
