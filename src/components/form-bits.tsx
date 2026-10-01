@@ -45,6 +45,15 @@ export function SubmitButton({
   );
 }
 
+/** Asks each message in turn; submits only if every one is confirmed. For destructive actions that touch money. */
+export function DoubleConfirmButton({ messages, children, className }: { messages: string[]; children: React.ReactNode; className?: string }) {
+  return (
+    <button type="submit" className={className} onClick={(e) => { if (!messages.every((m) => confirm(m))) e.preventDefault(); }}>
+      {children}
+    </button>
+  );
+}
+
 export function ConfirmButton({ message, children, className, name, value }: { message: string; children: React.ReactNode; className?: string; name?: string; value?: string }) {
   return (
     <button

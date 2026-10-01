@@ -235,6 +235,19 @@ export async function voidInvoice(form: FormData) {
   revalidatePath(`/app/invoices/${inv.id}`);
 }
 
+/** Delete any invoice, paid or not, along with its payments. The page asks twice before calling this. */
+export async function deleteInvoice(form: FormData) {
+  const { inv, business } = await ownInvoice(str(form, "id"));
+  await db.$transaction([
+    db.payment.deleteMany({ where: { invoiceId: inv.id, businessId: business.id } }),
+    db.invoice.delete({ where: { id: inv.id } }),
+  ]);
+  revalidatePath("/app/invoices");
+  revalidatePath("/app/payments");
+  revalidatePath("/app");
+  redirect(inv.kind === "QUOTE" ? "/app/quotes" : "/app/invoices");
+}
+
 export async function deleteDraft(form: FormData) {
   const { inv } = await ownInvoice(str(form, "id"));
   if (inv.status === "DRAFT" && inv.amountPaid === 0) await db.invoice.delete({ where: { id: inv.id } });
@@ -294,19 +307,32 @@ export async function bulkInvoiceAction(_: FormState, form: FormData): Promise<F
   const op = str(form, "op");
   const invoices = await db.invoice.findMany({
     where: { id: { in: ids }, businessId: business.id, kind: "INVOICE" },
-    select: { id: true, status: true, amountPaid: true, _count: { select: { payments: true } } },
+    select: { id: true, status: true, amountPaid: true, payments: { select: { reference: true } } },
   });
   const plural = (n: number) => `${n} invoice${n === 1 ? "" : "s"}`;
 
   if (op === "delete") {
-    const deletable = invoices.filter((i) => i.amountPaid === 0 && i._count.payments === 0).map((i) => i.id);
-    const kept = invoices.length - deletable.length;
-    if (deletable.length) await db.invoice.deleteMany({ where: { id: { in: deletable }, businessId: business.id } });
+    // Invoices with payments (recorded by hand or online) go only when the user confirmed it twice ("withPayments"),
+    // and their payments go with them. Deleting never refunds anyone; the client says so before asking.
+    const withPayments = str(form, "withPayments") === "1";
+    const paid = invoices.filter((i) => i.amountPaid > 0 || i.payments.length > 0);
+    const deletable = invoices.filter((i) => withPayments || !paid.includes(i)).map((i) => i.id);
+    if (deletable.length) {
+      await db.$transaction([
+        db.payment.deleteMany({ where: { invoiceId: { in: deletable }, businessId: business.id } }),
+        db.invoice.deleteMany({ where: { id: { in: deletable }, businessId: business.id } }),
+      ]);
+    }
+    const keptPaid = withPayments ? 0 : paid.length;
     revalidatePath("/app/invoices");
+    revalidatePath("/app/payments");
     revalidatePath("/app");
     return {
       ok: deletable.length > 0,
-      message: `Deleted ${plural(deletable.length)}.${kept ? ` ${plural(kept)} with payments recorded ${kept === 1 ? "was" : "were"} kept, so your books still match the money received. To remove ${kept === 1 ? "it" : "them"}, delete the payments on the invoice first.` : ""}`,
+      message: [
+        `Deleted ${plural(deletable.length)}${withPayments && paid.length ? `, including ${paid.length} with payments (those payments were removed too)` : ""}.`,
+        keptPaid ? `${plural(keptPaid)} with payments ${keptPaid === 1 ? "was" : "were"} kept.` : "",
+      ].filter(Boolean).join(" "),
     };
   }
 
