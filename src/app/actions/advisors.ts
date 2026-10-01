@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
+import { clientIp, recent, record } from "@/lib/rate-limit";
 import { getCurrentUser } from "@/lib/auth";
 import { ADVISOR_SERVICES } from "@/lib/advisors";
 import { layout, sendEmail, escapeHtml as esc } from "@/lib/email";
@@ -21,6 +22,9 @@ export async function requestAdvisor(_: FormState, form: FormData): Promise<Form
   // Honeypot: real people never fill this hidden field.
   if (str(form, "website")) return { ok: true, message: "Thanks, we'll be in touch." };
   if (Object.keys(errors).length) return { errors, values: { ...values, services: services.join(",") } };
+  const ip = await clientIp();
+  if ((await recent("ADVISOR_IP", ip, 60)) >= 5) return { message: "We've already got your request. An advisor will be in touch within one working day." };
+  await record("ADVISOR_IP", ip);
 
   await db.advisorRequest.create({
     data: {

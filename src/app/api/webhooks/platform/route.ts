@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   if (event.event === "charge.success" && reference.startsWith("bbsub-")) {
     const pending = await db.platformPayment.findUnique({ where: { reference } });
     const v = pending ? await verifyPayment("PAYSTACK", key, reference) : null;
-    if (pending && v?.paid && v.amount >= pending.amount) await activatePro(pending.id);
+    if (pending && v?.paid && v.currency === "NGN" && v.amount >= pending.amount) await activatePro(pending.id);
   } else if (event.event === "charge.success") {
     // settlePlatformReference re-verifies with Paystack and checks the subaccount before recording.
     const invoiceId = invoiceIdFromReference(reference);

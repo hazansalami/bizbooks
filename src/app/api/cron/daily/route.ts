@@ -3,15 +3,16 @@ import { runReferralPrompts, runTrialEmails, sweepReferrals, trialEndedEmail } f
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { runSchedule } from "@/lib/recurring";
+import { clearOldRateEvents } from "@/lib/rate-limit";
 import { runRecurringExpense } from "@/lib/recurring-expenses";
 import { runNurture } from "@/lib/nurture";
 import { emailInvoice, loadFullInvoice } from "@/lib/invoices";
 import { isPro, isTrial } from "@/lib/plan";
-import { layout, sendEmail } from "@/lib/email";
+import { layout, sendEmail, escapeHtml as esc } from "@/lib/email";
 import { balanceDue, naira } from "@/lib/money";
 import { siteUrl } from "@/lib/site-url";
 import { addDays, daysBetween, formatDate, startOfDay } from "@/lib/utils";
-import { FREE_RECURRING_EXPENSE_LIMIT, RENEWAL_GRACE_DAYS } from "@/lib/constants";
+import { FREE_RECURRING_EXPENSE_LIMIT, FREE_RECURRING_LIMIT, RENEWAL_GRACE_DAYS } from "@/lib/constants";
 
 export const maxDuration = 300;
 
@@ -36,8 +37,8 @@ export async function GET(request: NextRequest) {
   for (const s of due) {
     try {
       if (!isPro(s.business)) {
-        // Free plan keeps its two oldest schedules running.
-        const allowed = await db.recurringSchedule.findMany({ where: { businessId: s.businessId, status: "ACTIVE" }, orderBy: { createdAt: "asc" }, take: 2, select: { id: true } });
+        // Free plan keeps its oldest schedules running, up to the Free allowance.
+        const allowed = await db.recurringSchedule.findMany({ where: { businessId: s.businessId, status: "ACTIVE" }, orderBy: { createdAt: "asc" }, take: FREE_RECURRING_LIMIT, select: { id: true } });
         if (!allowed.some((a) => a.id === s.id)) continue;
       }
       if (await runSchedule(s.id)) out.recurring++;
@@ -104,7 +105,7 @@ export async function GET(request: NextRequest) {
     const { html, text } = layout({
       heading: left > 0 ? `Your BizBooks Pro ends in ${left} day${left > 1 ? "s" : ""}` : "Your BizBooks Pro ends today",
       paragraphs: [
-        `Hi ${b.owner.fullName.split(" ")[0]}, your Pro plan for ${b.name} runs until ${formatDate(b.proUntil)}.`,
+        `Hi ${esc(b.owner.fullName.split(" ")[0])}, your Pro plan for ${esc(b.name)} runs until ${formatDate(b.proUntil)}.`,
         "Renew to keep automatic reminders and all your recurring invoices running. We never charge you automatically, so nothing happens unless you choose to renew.",
       ],
       button: { label: "Renew Pro", href: new URL("/app/settings/billing", siteUrl()).toString() },
@@ -129,7 +130,7 @@ export async function GET(request: NextRequest) {
     const owed = b.invoices.reduce((s, i) => s + balanceDue(i) * i.exchangeRate, 0);
     const late = b.invoices.filter((i) => i.dueDate < now).length;
     const sentAny = await db.invoice.count({ where: { businessId: b.id, sentAt: { not: null } } });
-    const first = b.owner.fullName.split(" ")[0];
+    const first = esc(b.owner.fullName.split(" ")[0]);
     const msg = owed > 0
       ? layout({
           heading: `${naira(owed)} is still owed to ${b.name}`,
@@ -139,7 +140,7 @@ export async function GET(request: NextRequest) {
       : !sentAny
         ? layout({
             heading: "Your first invoice takes about a minute",
-            paragraphs: [`Hi ${first}, ${b.name} is set up but you haven't sent an invoice yet. Try one for your next job. Send it on WhatsApp and see how fast customers pay when there's a “Pay now” button.`],
+            paragraphs: [`Hi ${first}, ${esc(b.name)} is set up but you haven't sent an invoice yet. Try one for your next job. Send it on WhatsApp and see how fast customers pay when there's a “Pay now” button.`],
             button: { label: "Create an invoice", href: new URL("/app/invoices/new", siteUrl()).toString() },
           })
         : null;
@@ -158,6 +159,14 @@ export async function GET(request: NextRequest) {
   } catch (e) {
     out.errors++;
     console.error("growth", e);
+  }
+
+  // 5b. Housekeeping: rate-limit counters older than a day are never read again.
+  try {
+    await clearOldRateEvents();
+  } catch (e) {
+    out.errors++;
+    console.error("rate events", e);
   }
 
   // 6. Calculator lead nurture emails (lib/nurture.ts).

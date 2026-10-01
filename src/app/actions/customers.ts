@@ -52,6 +52,8 @@ export async function deleteCustomer(form: FormData) {
   const c = await db.customer.findFirst({ where: { id, businessId: business.id }, include: { _count: { select: { invoices: true } } } });
   if (!c) redirect("/app/customers");
   if (c._count.invoices > 0) redirect(`/app/customers/${id}?error=has-invoices`);
+  // Deleting a client also deletes their recurring schedules, so make the owner end those deliberately first.
+  if (await db.recurringSchedule.count({ where: { customerId: id, status: { in: ["ACTIVE", "PAUSED"] } } })) redirect(`/app/customers/${id}?error=has-recurring`);
   await db.customer.delete({ where: { id } });
   revalidatePath("/app/customers");
   redirect("/app/customers");

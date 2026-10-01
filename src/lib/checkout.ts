@@ -7,7 +7,7 @@ import { applyPayment, platformReady, publicInvoiceUrl, type FullInvoice } from 
 import { GATEWAY_CURRENCIES } from "./currency";
 import { balanceDue, money, naira, round2 } from "./money";
 import { siteUrl } from "./site-url";
-import { layout, sendEmail } from "./email";
+import { layout, sendEmail, escapeHtml as esc } from "./email";
 import { PLATFORM_FEE, feeFor, startSplitCheckout, vatInFee, verifySplit } from "./platform-payments";
 
 /** Paystack first, then Flutterwave, among gateways that can charge in the invoice's currency. */
@@ -73,6 +73,7 @@ export async function settleReference(invoiceId: string, provider: Provider, ref
   const v = await verifyPayment(provider, decryptSecret(gateway.secretKeyEnc), reference);
   if (!v || !v.paid || v.currency !== inv.currency || v.reference !== reference) return { ok: false as const };
   const r = await applyPayment(inv.id, { amount: v.amount, method: provider, reference, paidAt: v.paidAt, note: `Paid online via ${provider === "PAYSTACK" ? "Paystack" : "Flutterwave"}` });
+  if (!r.ok) await alertUnapplied(inv, v.amount, reference, r.error);
   if (r.ok && !("duplicate" in r && r.duplicate)) {
     await notifyPaid(inv, v.amount, r.fullyPaid, `The money is in your ${provider === "PAYSTACK" ? "Paystack" : "Flutterwave"} account and will settle to your bank on your usual schedule.`);
   }
@@ -94,12 +95,14 @@ export async function settlePlatformReference(invoiceId: string, reference: stri
     amount: v.amount, method: "PAYSTACK", reference, paidAt: v.paidAt, note: "Paid online via BizBooks Payments",
     viaPlatform: true, platformFee: v.platformFee, processorFee: v.processorFee,
   });
+  if (!r.ok) await alertUnapplied(inv, v.amount, reference, r.error);
   if (r.ok && !("duplicate" in r && r.duplicate)) {
     const fees = round2(v.platformFee + v.processorFee);
     await db.$transaction([
       // A fee-free payment used one from the allowance (only payments that would otherwise carry a fee count).
+      // Never below zero, even when two fee-free payments settle at once.
       ...(v.platformFee === 0 && v.amount >= PLATFORM_FEE.freeBelow && account.feeFreeLeft > 0
-        ? [db.paymentAccount.update({ where: { id: account.id }, data: { feeFreeLeft: { decrement: 1 } } })]
+        ? [db.paymentAccount.updateMany({ where: { id: account.id, feeFreeLeft: { gt: 0 } }, data: { feeFreeLeft: { decrement: 1 } } })]
         : []),
       // Fees come off before settlement, so book them as an expense to keep the books matching the bank.
       ...(fees > 0 ? [db.expense.create({
@@ -117,18 +120,40 @@ export async function settlePlatformReference(invoiceId: string, reference: stri
   return { ok: r.ok };
 }
 
+/**
+ * The gateway confirmed real money, but it couldn't be recorded (usually the invoice was cancelled while the
+ * client was paying). Tell the owner so they can record it on another invoice or refund it, rather than the
+ * payment silently going nowhere.
+ */
+async function alertUnapplied(inv: SettleInvoice, amount: number, reference: string, reason: string) {
+  console.warn(`[checkout] unapplied payment ${reference} on ${inv.id}: ${reason}`);
+  // The webhook and the browser redirect both arrive: alert once per payment.
+  const note = `Payment ${reference} couldn't be recorded: ${reason}`;
+  if (await db.invoiceEvent.findFirst({ where: { invoiceId: inv.id, note } })) return;
+  await db.invoiceEvent.create({ data: { invoiceId: inv.id, type: "UNAPPLIED", note } });
+  const { html, text } = layout({
+    heading: `${inv.customer.name} paid ${money(amount, inv.currency)} on a cancelled invoice`,
+    paragraphs: [
+      `The payment for ${esc(inv.number)} went through, but we couldn't record it: ${esc(reason)}`,
+      `Check your ${inv.business.paymentAccount ? "bank" : "payment gateway"} for reference <strong>${esc(reference)}</strong>, then either record it against the right invoice or refund the client.`,
+    ],
+    button: { label: "Open the invoice", href: new URL(`/app/invoices/${inv.id}`, siteUrl()).toString() },
+  });
+  await sendEmail({ to: inv.business.email || inv.business.owner.email, subject: `Action needed: payment on cancelled invoice ${inv.number}`, html, text });
+}
+
 async function notifyPaid(inv: SettleInvoice, amount: number, fullyPaid: boolean | undefined, whereMoney: string) {
   const to = inv.business.email || inv.business.owner.email;
   const { html, text } = layout({
     heading: `${inv.customer.name} paid ${money(amount, inv.currency)}`,
-    paragraphs: [`Invoice ${inv.number} ${fullyPaid ? "is now fully paid" : "has a new part payment"}. ${whereMoney}`],
+    paragraphs: [`Invoice ${esc(inv.number)} ${fullyPaid ? "is now fully paid" : "has a new part payment"}. ${whereMoney}`],
     button: { label: "View invoice", href: new URL(`/app/invoices/${inv.id}`, siteUrl()).toString() },
   });
   await sendEmail({ to, subject: `Payment received: ${money(amount, inv.currency)} for ${inv.number}`, html, text });
   if (inv.customer.email) {
     const receipt = layout({
       heading: `Payment received, thank you`,
-      paragraphs: [`${inv.business.name} has received your payment of <strong>${money(amount, inv.currency)}</strong> for invoice ${inv.number}.`],
+      paragraphs: [`${esc(inv.business.name)} has received your payment of <strong>${money(amount, inv.currency)}</strong> for invoice ${esc(inv.number)}.`],
       button: { label: "View receipt", href: publicInvoiceUrl(inv.publicToken) },
     });
     await sendEmail({ to: inv.customer.email, subject: `Receipt for ${inv.number} from ${inv.business.name}`, html: receipt.html, text: receipt.text, replyTo: inv.business.email, fromName: inv.business.name });

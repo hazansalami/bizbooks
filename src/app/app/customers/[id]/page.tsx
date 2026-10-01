@@ -48,6 +48,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
         </>}
       />
       {error === "has-invoices" && <Notice tone="sun" className="mb-4">This client has invoices, so they can't be deleted. Your records need them.</Notice>}
+      {error === "has-recurring" && <Notice tone="sun" className="mb-4">This client has recurring invoices set up. End them under <Link href="/app/recurring" className="font-semibold underline">Recurring invoices</Link> first, then delete the client.</Notice>}
       <div className="mb-5 flex flex-wrap gap-2">
         {c.phone && <a href={whatsappLink(c.phone, `Hello ${greetingName(c.name)}, `)} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}><MessageCircle className="size-4" aria-hidden /> WhatsApp</a>}
         {c.phone && <a href={`tel:${c.phone}`} className={buttonClass("secondary", "sm")}><Phone className="size-4" aria-hidden /> Call</a>}

@@ -675,3 +675,15 @@ model Referral {
   @@index([referrerId, status])
   @@index([status, createdAt])
 }
+
+/// Short-lived events counted for rate limits (failed logins, public form sends). Old rows are cleared daily.
+model RateEvent {
+  id        String   @id @default(cuid())
+  // e.g. LOGIN_FAIL_EMAIL, LOGIN_FAIL_IP, LEAD_IP
+  kind      String
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([kind, key, createdAt])
+  @@index([createdAt])
+}

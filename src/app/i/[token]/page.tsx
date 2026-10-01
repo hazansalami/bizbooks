@@ -79,6 +79,7 @@ export default async function PublicInvoice({ params, searchParams }: Props) {
             token={token}
             businessName={inv.business.name}
             balance={due}
+            currency={inv.currency}
             online={canPayOnline(inv)}
             providerName={gateway?.provider === "FLUTTERWAVE" ? "Flutterwave" : "Paystack"}
             needsEmail={!inv.customer.email}

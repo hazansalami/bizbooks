@@ -34,8 +34,7 @@ export function InvoiceList({ rows, toolbar, empty }: { rows: InvoiceRow[]; tool
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const chosen = rows.filter((r) => selected.has(r.id));
   const online = chosen.filter((r) => r.paidOnline).length;
-  const withPayments = chosen.filter((r) => r.hasPayments || r.paidOnline).length;
-  const [alsoPaid, setAlsoPaid] = useState(false);
+  const withPayments = chosen.filter((r) => r.hasPayments).length;
   const openCount = chosen.filter((r) => !["PAID", "VOID"].includes(r.status)).length;
 
   return (
@@ -82,9 +81,10 @@ export function InvoiceList({ rows, toolbar, empty }: { rows: InvoiceRow[]; tool
             if (op === "delete") {
               const n = selected.size;
               if (!window.confirm(`Permanently delete ${n} invoice${n === 1 ? "" : "s"}? This can't be undone.`)) { e.preventDefault(); return; }
-              // Second, separate confirmation before payments are removed from the books.
+              // Second, separate confirmation before payments are removed from the books. Cancel stops everything:
+              // to delete only the unpaid ones, untick the paid ones first.
               const it = withPayments === 1 ? "it" : "them";
-              const both = withPayments > 0 && window.confirm(
+              if (withPayments > 0 && !window.confirm(
                 `${withPayments} of these ${withPayments === 1 ? "has" : "have"} payments recorded. Delete ${it} too?
 
 `
@@ -92,13 +92,11 @@ export function InvoiceList({ rows, toolbar, empty }: { rows: InvoiceRow[]; tool
                 + (online ? ` ${online} ${online === 1 ? "was" : "were"} paid online: deleting doesn't refund the client, so refund in Paystack or Flutterwave first if you need to.` : "")
                 + `
 
-OK: delete ${it} and the payments.
-Cancel: keep ${it}${n > withPayments ? " and delete only the others" : ""}.`,
-              );
-              if (withPayments > 0 && !both && n === withPayments) { e.preventDefault(); return; }
+OK: delete all ${n}, with their payments.
+Cancel: delete nothing. (To keep the paid ones, untick them first.)`,
+              )) { e.preventDefault(); return; }
               const flag = e.currentTarget.elements.namedItem("withPayments") as HTMLInputElement | null;
-              if (flag) flag.value = both ? "1" : "";
-              setAlsoPaid(both);
+              if (flag) flag.value = withPayments > 0 ? "1" : "";
             }
             onSubmit(e);
           }}
@@ -106,7 +104,7 @@ Cancel: keep ${it}${n > withPayments ? " and delete only the others" : ""}.`,
           aria-label="Bulk actions"
         >
           <input type="hidden" name="ids" value={JSON.stringify([...selected])} />
-          <input type="hidden" name="withPayments" defaultValue={alsoPaid ? "1" : ""} />
+          <input type="hidden" name="withPayments" defaultValue="" />
           <div className="flex flex-wrap items-center gap-2">
             <p className="mr-auto text-sm font-semibold">{selected.size} selected</p>
             <button type="button" onClick={() => setPaying((p) => !p)} disabled={!openCount} aria-expanded={paying} className={buttonClass("primary", "sm")}>

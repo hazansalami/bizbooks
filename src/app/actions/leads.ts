@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
+import { clientIp, recent as recentEvents, record } from "@/lib/rate-limit";
 import { layout, sendEmail, escapeHtml as esc } from "@/lib/email";
 import { siteUrl } from "@/lib/site-url";
 import { TOOL_BY_SLUG } from "@/lib/tools";
@@ -25,6 +26,12 @@ export async function emailResults(_: FormState, form: FormData): Promise<FormSt
   } catch {}
   const inputs = str(form, "inputs").slice(0, 500);
 
+  // Anyone can post this form, so limit it by sender too: 10 an hour per IP, and 300 an hour overall.
+  const ip = await clientIp();
+  if ((await recentEvents("LEAD_IP", ip, 60)) >= 10 || (await db.lead.count({ where: { createdAt: { gt: new Date(Date.now() - 3600_000) } } })) >= 300) {
+    return { message: "We're getting a lot of requests right now. Please try again in an hour." };
+  }
+  await record("LEAD_IP", ip);
   // Light rate limit: at most 5 emails per address per tool per day.
   const since = new Date(Date.now() - 86400000);
   const recent = await db.lead.count({ where: { email, tool: tool.slug, createdAt: { gte: since } } });

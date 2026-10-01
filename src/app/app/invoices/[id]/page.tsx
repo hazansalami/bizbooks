@@ -19,7 +19,7 @@ export const metadata = { title: "Invoice" };
 const EVENT_LABELS: Record<string, string> = {
   CREATED: "Created", SENT: "Sent", VIEWED: "Opened by customer", REMINDER: "Reminder sent", PAYMENT: "Payment received",
   CLAIM: "Client says they paid", VOID: "Cancelled", CONVERTED: "Turned into invoice", ACCEPTED: "Accepted by client",
-  IMPORTED: "Imported",
+  IMPORTED: "Imported", UNAPPLIED: "Payment needs attention",
 };
 
 export default async function InvoicePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ share?: string }> }) {

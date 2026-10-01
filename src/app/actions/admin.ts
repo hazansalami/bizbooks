@@ -31,7 +31,7 @@ export async function revokePro(form: FormData) {
   const admin = await requireAdmin();
   const b = await business(str(form, "id"));
   if (!b) return;
-  await db.business.update({ where: { id: b.id }, data: { plan: "FREE", proUntil: null, cancelAtEnd: false, pausedUntil: null } });
+  await db.business.update({ where: { id: b.id }, data: { plan: "FREE", proUntil: null, paidUntil: null, cancelAtEnd: false, pausedUntil: null } });
   await logAdmin(admin.email, "REVOKE_PRO", b.id, str(form, "note") || undefined);
   done(b.id);
 }
