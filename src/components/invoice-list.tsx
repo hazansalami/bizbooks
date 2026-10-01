@@ -16,7 +16,7 @@ export type InvoiceRow = {
 };
 
 /** The invoice list with bulk selection: mark paid, cancel or delete many at once. */
-export function InvoiceList({ rows }: { rows: InvoiceRow[] }) {
+export function InvoiceList({ rows, toolbar, empty }: { rows: InvoiceRow[]; toolbar?: React.ReactNode; empty: React.ReactNode }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [paying, setPaying] = useState(false);
   const { state, onSubmit, pending } = useFormAction<FormState>(bulkInvoiceAction, {});
@@ -40,7 +40,9 @@ export function InvoiceList({ rows }: { rows: InvoiceRow[] }) {
 
   return (
     <>
+      {toolbar}
       {state.message && <Notice tone={state.ok ? "brand" : "danger"} className="mb-3">{state.message}</Notice>}
+      {rows.length === 0 ? empty : (<>
       <div className="mb-2 flex items-center gap-3 px-1 text-sm">
         <label className="flex min-h-10 cursor-pointer items-center gap-2 font-semibold text-ink-soft">
           <input type="checkbox" checked={all} onChange={() => setSelected(all ? new Set() : new Set(ids))} className="size-5 accent-brand" aria-label="Select all invoices shown" />
@@ -74,6 +76,9 @@ export function InvoiceList({ rows }: { rows: InvoiceRow[] }) {
       {selected.size > 0 && (
         <form
           onSubmit={(e) => {
+            // Each submit button carries its own op, so the action never depends on a state update landing first.
+            const op = ((e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null)?.value ?? "";
+            setOp(op);
             if (op === "delete") {
               const n = selected.size;
               if (!window.confirm(`Permanently delete ${n} invoice${n === 1 ? "" : "s"}? This can't be undone.`)) { e.preventDefault(); return; }
@@ -101,17 +106,16 @@ Cancel: keep ${it}${n > withPayments ? " and delete only the others" : ""}.`,
           aria-label="Bulk actions"
         >
           <input type="hidden" name="ids" value={JSON.stringify([...selected])} />
-          <input type="hidden" name="op" value={op} />
           <input type="hidden" name="withPayments" defaultValue={alsoPaid ? "1" : ""} />
           <div className="flex flex-wrap items-center gap-2">
             <p className="mr-auto text-sm font-semibold">{selected.size} selected</p>
             <button type="button" onClick={() => setPaying((p) => !p)} disabled={!openCount} aria-expanded={paying} className={buttonClass("primary", "sm")}>
               <CheckCheck className="size-4" aria-hidden /> Mark as paid
             </button>
-            <button type="submit" onClick={() => setOp("void")} disabled={pending || !openCount} className={buttonClass("secondary", "sm")}>
+            <button type="submit" name="op" value="void" disabled={pending || !openCount} className={buttonClass("secondary", "sm")}>
               <Ban className="size-4" aria-hidden /> Cancel
             </button>
-            <button type="submit" onClick={() => setOp("delete")} disabled={pending} className={buttonClass("secondary", "sm", "text-danger")}>
+            <button type="submit" name="op" value="delete" disabled={pending} className={buttonClass("secondary", "sm", "text-danger")}>
               <Trash2 className="size-4" aria-hidden /> Delete
             </button>
             <button type="button" onClick={() => { setSelected(new Set()); setPaying(false); }} aria-label="Clear selection" className="grid size-9 place-items-center rounded-full text-muted hover:bg-canvas hover:text-ink">
@@ -130,7 +134,7 @@ Cancel: keep ${it}${n > withPayments ? " and delete only the others" : ""}.`,
                   {Object.entries(PAYMENT_METHODS).filter(([k]) => k !== "PAYSTACK" && k !== "FLUTTERWAVE").map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
               </label>
-              <button type="submit" onClick={() => setOp("paid")} disabled={pending} className={buttonClass("primary", "sm")}>
+              <button type="submit" name="op" value="paid" disabled={pending} className={buttonClass("primary", "sm")}>
                 {pending && op === "paid" ? "Saving…" : `Record full payment on ${openCount} invoice${openCount === 1 ? "" : "s"}`}
               </button>
               <p className="w-full text-xs text-muted">Each invoice gets a payment for its outstanding balance. Paid and cancelled invoices are skipped.</p>
@@ -144,6 +148,7 @@ Cancel: keep ${it}${n > withPayments ? " and delete only the others" : ""}.`,
           )}
         </form>
       )}
+      </>)}
     </>
   );
 }
