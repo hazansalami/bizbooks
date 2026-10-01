@@ -21,6 +21,7 @@ const MESSAGES: Record<string, { tone: "brand" | "danger" | "sun"; text: string 
   cancelled: { tone: "sun", text: "Pro won't renew. You keep Pro until the end of your paid time, then move to the Free plan. Your data stays." },
   "billing-off": { tone: "danger", text: "Upgrades aren't switched on yet for this installation." },
   checkout: { tone: "danger", text: "We couldn't open the payment page. Please try again." },
+  offer: { tone: "sun", text: "That offer isn't available on your plan right now, or it's already been used. Reply to any of our emails if you'd like to talk it through." },
   verify: { tone: "danger", text: "We couldn't confirm that payment yet. If you were charged, it will be applied automatically, so there's no need to pay again." },
 };
 

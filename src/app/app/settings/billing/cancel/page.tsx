@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { MessageCircle, PauseCircle, Percent } from "lucide-react";
+import { saveOfferAllowed } from "@/lib/billing";
 import { requireBusiness } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { isPro } from "@/lib/plan";
@@ -33,7 +34,8 @@ export default async function CancelFlow({ searchParams }: { searchParams: Promi
     const offer = ["TOO_EXPENSIVE", "SWITCHING"].includes(reason) ? "DISCOUNT"
       : ["NOT_USING", "SEASONAL"].includes(reason) ? "PAUSE"
       : ["TECHNICAL", "MISSING_FEATURE"].includes(reason) ? "HELP" : null;
-    if (!offer) redirect(cont);
+    // Skip offers this business can't take (trials, or one already used) rather than offering and refusing.
+    if (!offer || ((offer === "DISCOUNT" || offer === "PAUSE") && !(await saveOfferAllowed(b, offer)))) redirect(cont);
     return (
       <div className="mx-auto max-w-xl">
         <PageHeader title="Before you go" />

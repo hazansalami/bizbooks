@@ -20,6 +20,15 @@ async function paymentsTrialBonus(businessId: string) {
   }
 }
 
+/**
+ * The business name can be edited in Settings, so it can't vouch for a new account on its own. Changing a live,
+ * verified account also needs the new account to be in the same name as the verified one; anything else is reviewed.
+ */
+function payoutNameMatches(accountName: string, business: { legalName: string | null; name: string }, existing: { subaccountCode: string | null; accountName: string } | null) {
+  const verifiedName = existing?.subaccountCode ? existing.accountName : null;
+  return accountMatchesBusiness(accountName, [business.legalName, business.name]) && (!verifiedName || accountMatchesBusiness(accountName, [verifiedName]));
+}
+
 async function bankFrom(form: FormData) {
   const code = str(form, "bankCode");
   return (await listBanks()).find((b) => b.code === code) ?? null;
@@ -34,7 +43,8 @@ export async function checkBankAccount(_: FormState, form: FormData): Promise<Fo
   if (!bank) return { errors: { bankCode: "Choose your bank." }, values };
   const r = await resolveAccount(accountNumber, bank.code, business.legalName || business.name);
   if (!r.ok) return { errors: { accountNumber: r.error }, values };
-  const matches = accountMatchesBusiness(r.accountName, [business.legalName, business.name]);
+  const existing = await db.paymentAccount.findUnique({ where: { businessId: business.id } });
+  const matches = payoutNameMatches(r.accountName, business, existing);
   return { ok: true, values: { ...values, accountName: r.accountName, matches: matches ? "yes" : "no" } };
 }
 
@@ -60,14 +70,19 @@ export async function activatePayments(_: FormState, form: FormData): Promise<Fo
   const r = await resolveAccount(values.accountNumber, bank.code, business.legalName || business.name);
   if (!r.ok) return { errors: { accountNumber: r.error }, values };
 
-  const matches = accountMatchesBusiness(r.accountName, [business.legalName, business.name]);
   const existing = await db.paymentAccount.findUnique({ where: { businessId: business.id } });
+  // A suspension is BizBooks' decision: re-submitting the account mustn't lift it.
+  if (existing?.status === "SUSPENDED") return { message: "BizBooks Payments is paused on your account. Reply to our email or contact support to discuss it.", values };
+  const verifiedName = existing?.subaccountCode ? existing.accountName : null;
+  const matches = payoutNameMatches(r.accountName, business, existing);
   const details = { bankCode: bank.code, bankName: bank.name, accountNumber: values.accountNumber, accountName: r.accountName };
   const displayName = business.legalName || business.name;
 
   let status = "PENDING_REVIEW";
   let subaccountCode = existing?.subaccountCode ?? null;
-  let reviewNote: string | null = matches ? null : `Account name "${r.accountName}" doesn't match "${displayName}".`;
+  let reviewNote: string | null = matches ? null : verifiedName && accountMatchesBusiness(r.accountName, [business.legalName, business.name])
+    ? `Account name "${r.accountName}" doesn't match the verified payout account "${verifiedName}".`
+    : `Account name "${r.accountName}" doesn't match "${displayName}".`;
   if (matches) {
     const s = subaccountCode
       ? await updateSubaccount(subaccountCode, { ...details, businessName: displayName })
@@ -115,7 +130,8 @@ export async function setPaymentsOn(form: FormData) {
   const a = await db.paymentAccount.findUnique({ where: { businessId: business.id } });
   if (!a) return;
   const on = str(form, "on") === "1";
-  if (on && a.status === "DISABLED" && a.subaccountCode) await db.paymentAccount.update({ where: { id: a.id }, data: { status: "ACTIVE" } });
+  // Only the owner's own "off" can be undone here; an account BizBooks rejected carries a review note.
+  if (on && a.status === "DISABLED" && a.subaccountCode && !a.reviewNote) await db.paymentAccount.update({ where: { id: a.id }, data: { status: "ACTIVE" } });
   if (!on && a.status === "ACTIVE") await db.paymentAccount.update({ where: { id: a.id }, data: { status: "DISABLED" } });
   revalidatePath("/app/settings/payments");
 }
