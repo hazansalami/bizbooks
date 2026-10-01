@@ -8,9 +8,9 @@ import { canPayOnline, emailDraft, loadFullInvoice, payUrl, publicInvoiceUrl, wh
 import { balanceDue, money, naira } from "@/lib/money";
 import { INVOICE_STATUS, PAYMENT_METHODS } from "@/lib/constants";
 import { daysBetween, formatDate, timeAgo, whatsappLink } from "@/lib/utils";
-import { convertQuote, deleteDraft, deletePayment, duplicateInvoice, resolveClaim, voidInvoice } from "@/app/actions/invoices";
+import { convertQuote, deleteDraft, deleteInvoice, deletePayment, duplicateInvoice, resolveClaim, voidInvoice } from "@/app/actions/invoices";
 import { Badge, buttonClass, Notice, Panel } from "@/components/ui";
-import { ConfirmButton, PrintButton } from "@/components/form-bits";
+import { ConfirmButton, DoubleConfirmButton, PrintButton } from "@/components/form-bits";
 import { InvoiceDocument } from "@/components/invoice-document";
 import { RecordPayment, SharePanel } from "@/components/invoice-actions";
 
@@ -121,6 +121,17 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
             <ConfirmButton message="Cancel this invoice? The customer will no longer be able to pay it." className={buttonClass("ghost", "sm", "text-danger")}><XCircle className="size-4" aria-hidden /> Cancel invoice</ConfirmButton>
           </form>
         ) : null}
+        {!(inv.status === "DRAFT" && inv.amountPaid === 0) && (
+          <form action={deleteInvoice}><input type="hidden" name="id" value={inv.id} />
+            <DoubleConfirmButton
+              messages={[
+                `Permanently delete ${inv.number}? This can't be undone.`,
+                ...(payments.length ? [`${inv.number} has ${payments.length === 1 ? "a payment" : `${payments.length} payments`} recorded (${money(inv.amountPaid, inv.currency)}). Deleting the invoice removes ${payments.length === 1 ? "it" : "them"} from your books too.${payments.some((p) => p.reference) ? " It was paid online: deleting doesn't refund the client, so refund in Paystack or Flutterwave first if you need to." : ""} Delete anyway?`] : []),
+              ]}
+              className={buttonClass("ghost", "sm", "text-danger")}
+            ><Trash2 className="size-4" aria-hidden /> Delete invoice</DoubleConfirmButton>
+          </form>
+        )}
       </div>
 
       {inv.acceptedAt && (

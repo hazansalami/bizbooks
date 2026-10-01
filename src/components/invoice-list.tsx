@@ -12,7 +12,7 @@ import { cn, dateInput } from "@/lib/utils";
 export type InvoiceRow = {
   id: string; customer: string; sub: string; amount: string;
   badge: { label: string; tone: "brand" | "sun" | "neutral" | "danger" | "info" };
-  hasPayments: boolean; status: string;
+  hasPayments: boolean; paidOnline: boolean; status: string;
 };
 
 /** The invoice list with bulk selection: mark paid, cancel or delete many at once. */
@@ -33,7 +33,9 @@ export function InvoiceList({ rows }: { rows: InvoiceRow[] }) {
   const all = ids.length > 0 && ids.every((id) => selected.has(id));
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const chosen = rows.filter((r) => selected.has(r.id));
-  const withPayments = chosen.filter((r) => r.hasPayments).length;
+  const online = chosen.filter((r) => r.paidOnline).length;
+  const withPayments = chosen.filter((r) => r.hasPayments || r.paidOnline).length;
+  const [alsoPaid, setAlsoPaid] = useState(false);
   const openCount = chosen.filter((r) => !["PAID", "VOID"].includes(r.status)).length;
 
   return (
@@ -72,7 +74,27 @@ export function InvoiceList({ rows }: { rows: InvoiceRow[] }) {
       {selected.size > 0 && (
         <form
           onSubmit={(e) => {
-            if (op === "delete" && !window.confirm(`Permanently delete ${selected.size} invoice${selected.size === 1 ? "" : "s"}? This can't be undone.${withPayments ? ` ${withPayments} with payments will be kept.` : ""}`)) { e.preventDefault(); return; }
+            if (op === "delete") {
+              const n = selected.size;
+              if (!window.confirm(`Permanently delete ${n} invoice${n === 1 ? "" : "s"}? This can't be undone.`)) { e.preventDefault(); return; }
+              // Second, separate confirmation before payments are removed from the books.
+              const it = withPayments === 1 ? "it" : "them";
+              const both = withPayments > 0 && window.confirm(
+                `${withPayments} of these ${withPayments === 1 ? "has" : "have"} payments recorded. Delete ${it} too?
+
+`
+                + `The payments will be removed from your books as well.`
+                + (online ? ` ${online} ${online === 1 ? "was" : "were"} paid online: deleting doesn't refund the client, so refund in Paystack or Flutterwave first if you need to.` : "")
+                + `
+
+OK: delete ${it} and the payments.
+Cancel: keep ${it}${n > withPayments ? " and delete only the others" : ""}.`,
+              );
+              if (withPayments > 0 && !both && n === withPayments) { e.preventDefault(); return; }
+              const flag = e.currentTarget.elements.namedItem("withPayments") as HTMLInputElement | null;
+              if (flag) flag.value = both ? "1" : "";
+              setAlsoPaid(both);
+            }
             onSubmit(e);
           }}
           className="sticky bottom-20 z-20 mt-4 rounded-2xl border border-line bg-paper/95 p-3 shadow-lg backdrop-blur lg:bottom-4"
@@ -80,6 +102,7 @@ export function InvoiceList({ rows }: { rows: InvoiceRow[] }) {
         >
           <input type="hidden" name="ids" value={JSON.stringify([...selected])} />
           <input type="hidden" name="op" value={op} />
+          <input type="hidden" name="withPayments" defaultValue={alsoPaid ? "1" : ""} />
           <div className="flex flex-wrap items-center gap-2">
             <p className="mr-auto text-sm font-semibold">{selected.size} selected</p>
             <button type="button" onClick={() => setPaying((p) => !p)} disabled={!openCount} aria-expanded={paying} className={buttonClass("primary", "sm")}>
@@ -113,9 +136,9 @@ export function InvoiceList({ rows }: { rows: InvoiceRow[] }) {
               <p className="w-full text-xs text-muted">Each invoice gets a payment for its outstanding balance. Paid and cancelled invoices are skipped.</p>
             </div>
           )}
-          {!paying && (withPayments > 0 || openCount < selected.size) && (
+          {!paying && (withPayments > 0 || online > 0 || openCount < selected.size) && (
             <p className="mt-2 text-xs text-muted">
-              {withPayments > 0 && `${withPayments} selected ${withPayments === 1 ? "has" : "have"} payments, so ${withPayments === 1 ? "it" : "they"} won't be deleted. `}
+              {withPayments > 0 && `${withPayments} selected ${withPayments === 1 ? "has" : "have"} payments recorded; you'll be asked twice before ${withPayments === 1 ? "it's" : "they're"} deleted with ${withPayments === 1 ? "its" : "their"} payments. `}
               Delete is permanent and only for invoices that were never real; Cancel keeps a record.
             </p>
           )}
