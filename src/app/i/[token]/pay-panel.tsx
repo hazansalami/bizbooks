@@ -5,12 +5,12 @@ import { Lock } from "lucide-react";
 import { claimTransfer, payNow } from "@/app/actions/public";
 import { CopyButton, SubmitButton, useFormAction, type FormState } from "@/components/form-bits";
 import { buttonClass, Field, Input, Notice } from "@/components/ui";
-import { naira } from "@/lib/money";
+import { money } from "@/lib/money";
 
 type Bank = { id: string; bankName: string; accountNumber: string; accountName: string };
 
-export function PayPanel({ token, balance, online, providerName, needsEmail, banks, number, color, businessName }: {
-  businessName: string; token: string; balance: number; online: boolean; providerName: string; needsEmail: boolean; banks: Bank[]; number: string; color: string;
+export function PayPanel({ token, balance, currency, online, providerName, needsEmail, banks, number, color, businessName }: {
+  businessName: string; token: string; balance: number; currency: string; online: boolean; providerName: string; needsEmail: boolean; banks: Bank[]; number: string; color: string;
 }) {
   const pay = useFormAction<FormState>(payNow, {});
   const claim = useFormAction<FormState>(claimTransfer, {});
@@ -21,7 +21,7 @@ export function PayPanel({ token, balance, online, providerName, needsEmail, ban
       <p className="text-sm text-muted">Paying <strong className="text-ink">{businessName}</strong> · {number}</p>
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-lg">Amount to pay</h2>
-        <p className="num text-3xl font-bold tracking-tight">{naira(balance)}</p>
+        <p className="num text-3xl font-bold tracking-tight">{money(balance, currency)}</p>
       </div>
 
       {online && (
@@ -34,7 +34,7 @@ export function PayPanel({ token, balance, online, providerName, needsEmail, ban
             </Field>
           )}
           <SubmitButton size="lg" className="w-full text-lg" pending={pay.pending} pendingText="Opening secure checkout…">
-            Pay {naira(balance)} now
+            Pay {money(balance, currency)} now
           </SubmitButton>
           <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted">
             <Lock className="size-3.5" aria-hidden /> Card, bank transfer or USSD · secured by {providerName}

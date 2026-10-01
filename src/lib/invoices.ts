@@ -122,17 +122,21 @@ export async function applyPayment(invoiceId: string, p: { amount: number; metho
           paidAt: p.paidAt ?? new Date(), note: p.note ?? null,
         },
       });
-      const amountPaid = round2(inv.amountPaid + amount);
-      const fullyPaid = balanceDue({ ...inv, amountPaid }) <= 0.005;
-      await tx.invoice.update({
+      // Increment in the database (which locks the row), then work out the status from what's there now,
+      // so an edit or another payment committed a moment ago can't leave the status stale.
+      const now = await tx.invoice.update({
         where: { id: invoiceId },
         data: {
-          amountPaid,
-          status: fullyPaid ? "PAID" : "PARTIAL",
-          paidAt: fullyPaid ? p.paidAt ?? new Date() : null,
+          amountPaid: { increment: amount },
           sentAt: inv.sentAt ?? new Date(),
           events: { create: { type: "PAYMENT", note: `${money(amount, inv.currency)} by ${p.method.replace("_", " ").toLowerCase()}` } },
         },
+      });
+      const amountPaid = round2(now.amountPaid);
+      const fullyPaid = balanceDue({ ...now, amountPaid }) <= 0.005;
+      await tx.invoice.update({
+        where: { id: invoiceId },
+        data: { amountPaid, status: fullyPaid ? "PAID" : "PARTIAL", paidAt: fullyPaid ? p.paidAt ?? new Date() : null },
       });
       return { ok: true as const, fullyPaid };
     });

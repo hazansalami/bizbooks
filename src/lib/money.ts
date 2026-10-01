@@ -63,7 +63,7 @@ export type InvoiceTotals = {
  */
 export function computeTotals(lines: LineInput[], discount: number, vatRate: number, whtRate: number): InvoiceTotals {
   const subtotal = round2(lines.reduce((s, l) => s + round2(l.quantity * l.unitPrice), 0));
-  const d = round2(Math.min(Math.max(discount, 0), subtotal));
+  const d = round2(Math.min(Math.max(discount, 0), Math.max(subtotal, 0)));
   const taxable = round2(subtotal - d);
   const vatAmount = round2((taxable * vatRate) / 100);
   const whtAmount = round2((taxable * whtRate) / 100);

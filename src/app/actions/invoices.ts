@@ -6,10 +6,10 @@ import { db } from "@/lib/db";
 import { requireBusiness } from "@/lib/auth";
 import { applyPayment, createInvoice, emailInvoice, loadFullInvoice, markSent, refreshInvoicePaid } from "@/lib/invoices";
 import { balanceDue, computeTotals, parseAmount, round2, type LineInput } from "@/lib/money";
-import { FREE_RECURRING_LIMIT, FREQUENCIES, PAYMENT_METHODS } from "@/lib/constants";
+import { EMAIL_CAP, FREE_RECURRING_LIMIT, FREQUENCIES, PAYMENT_METHODS } from "@/lib/constants";
 import { advance } from "@/lib/recurring";
 import { isCurrency } from "@/lib/currency";
-import { isPro } from "@/lib/plan";
+import { isPaidPro, isPro } from "@/lib/plan";
 import { dateOrNull, formatDate, str } from "@/lib/utils";
 import { z } from "zod";
 import type { FormState } from "@/components/form-bits";
@@ -109,17 +109,23 @@ export async function saveInvoice(_: FormState, form: FormData): Promise<FormSta
     if (!inv) return { message: "Invoice not found." };
     if (inv.amountPaid > 0 || inv.status === "VOID") return { message: "Invoices with payments can't be edited. Cancel it and create a new one instead." };
     const t = computeTotals(lines, discount, vatRate, whtRate);
-    await db.$transaction([
-      db.invoiceItem.deleteMany({ where: { invoiceId: id } }),
-      db.invoice.update({
+    const saved = await db.$transaction(async (tx) => {
+      // Re-check "no payments" as part of the write (this also locks the row), so a payment that arrived
+      // after the check above isn't left sitting on an invoice whose total just changed.
+      const unpaid = await tx.invoice.updateMany({ where: { id, businessId: business.id, amountPaid: 0, status: { not: "VOID" } }, data: { updatedAt: new Date() } });
+      if (unpaid.count !== 1) return false;
+      await tx.invoiceItem.deleteMany({ where: { invoiceId: id } });
+      await tx.invoice.update({
         where: { id },
         data: {
           customerId, issueDate, dueDate: dueDate!, subtotal: t.subtotal, discount: t.discount, vatRate, vatAmount: t.vatAmount,
           whtRate, whtAmount: t.whtAmount, total: t.total, notes, poNumber, title, summary, currency, exchangeRate, depositPercent: inv.kind === "QUOTE" ? depositPercent : null,
           items: { create: lines.map((l, i) => ({ description: l.description, details: l.details, quantity: l.quantity, unitPrice: l.unitPrice, amount: round2(l.quantity * l.unitPrice), position: i })) },
         },
-      }),
-    ]);
+      });
+      return true;
+    });
+    if (!saved) return { message: "A payment was just recorded on this invoice, so it can't be edited now. Cancel it and create a new one instead.", values };
   } else {
     invoiceId = await db.$transaction(async (tx) => {
       let recurringId: string | null = null;
@@ -156,7 +162,7 @@ export async function saveInvoice(_: FormState, form: FormData): Promise<FormSta
 }
 
 export async function emailInvoiceAction(_: FormState, form: FormData): Promise<FormState> {
-  const { inv } = await ownInvoice(str(form, "id"));
+  const { inv, business } = await ownInvoice(str(form, "id"));
   const full = await loadFullInvoice(inv.id);
   const kind = str(form, "kind") === "reminder" ? "reminder" : "send";
   // Recipients typed in the dialog: commas, semicolons or spaces between addresses, at most 5.
@@ -169,6 +175,14 @@ export async function emailInvoiceAction(_: FormState, form: FormData): Promise<
   if (!values.subject.trim()) return { errors: { subject: "Add a subject." }, values };
   if (!values.message.trim()) return { errors: { message: "Add a message." }, values };
   if (values.message.length > 5000 || values.subject.length > 200) return { message: "That message is too long. Keep it under 5,000 characters.", values };
+  // A daily cap per business keeps the dialog from being used to send bulk mail from BizBooks' domain.
+  // New accounts start lower; real use is far below either limit.
+  const newAccount = business.createdAt > new Date(Date.now() - 7 * 86_400_000) && !isPaidPro(business);
+  const cap = newAccount ? EMAIL_CAP.newAccount : EMAIL_CAP.daily;
+  const sentToday = await db.invoiceEvent.count({
+    where: { invoice: { businessId: business.id }, type: { in: ["SENT", "REMINDER"] }, note: { startsWith: "Emailed" }, createdAt: { gt: new Date(Date.now() - 86_400_000) } },
+  });
+  if (sentToday >= cap) return { message: `You've sent ${cap} invoice emails in the last 24 hours, the most we allow${newAccount ? " for a new account" : ""}. Share by WhatsApp or link for now, or try again tomorrow.`, values };
   // Remember the address on the client if they didn't have one.
   if (!full!.customer.email) await db.customer.update({ where: { id: full!.customerId }, data: { email: to[0] } });
   const { user } = await requireBusiness();
@@ -317,34 +331,44 @@ export async function bulkInvoiceAction(_: FormState, form: FormData): Promise<F
     const withPayments = str(form, "withPayments") === "1";
     const paid = invoices.filter((i) => i.amountPaid > 0 || i.payments.length > 0);
     const deletable = invoices.filter((i) => withPayments || !paid.includes(i)).map((i) => i.id);
+    let deleted = 0;
     if (deletable.length) {
-      await db.$transaction([
-        db.payment.deleteMany({ where: { invoiceId: { in: deletable }, businessId: business.id } }),
-        db.invoice.deleteMany({ where: { id: { in: deletable }, businessId: business.id } }),
-      ]);
+      // Without the second confirmation, re-check "no money" in the delete itself: a payment that lands
+      // between the read above and this write keeps its invoice instead of vanishing with it.
+      const where = { id: { in: deletable }, businessId: business.id };
+      const removed = withPayments
+        ? (await db.$transaction([
+            db.payment.deleteMany({ where: { invoiceId: { in: deletable }, businessId: business.id } }),
+            db.invoice.deleteMany({ where }),
+          ]))[1]
+        : await db.invoice.deleteMany({ where: { ...where, amountPaid: 0, payments: { none: {} } } });
+      deleted = removed.count;
     }
     const keptPaid = withPayments ? 0 : paid.length;
     revalidatePath("/app/invoices");
     revalidatePath("/app/payments");
     revalidatePath("/app");
     return {
-      ok: deletable.length > 0,
+      ok: deleted > 0,
       message: [
-        `Deleted ${plural(deletable.length)}${withPayments && paid.length ? `, including ${paid.length} with payments (those payments were removed too)` : ""}.`,
+        `Deleted ${plural(deleted)}${withPayments && paid.length ? `, including ${paid.length} with payments (those payments were removed too)` : ""}.`,
         keptPaid ? `${plural(keptPaid)} with payments ${keptPaid === 1 ? "was" : "were"} kept.` : "",
       ].filter(Boolean).join(" "),
     };
   }
 
   if (op === "void") {
-    const voidable = invoices.filter((i) => !["VOID", "PAID"].includes(i.status)).map((i) => i.id);
-    const skipped = invoices.length - voidable.length;
+    let voidable = invoices.filter((i) => !["VOID", "PAID"].includes(i.status)).map((i) => i.id);
     if (voidable.length) {
-      await db.$transaction([
-        db.invoice.updateMany({ where: { id: { in: voidable }, businessId: business.id }, data: { status: "VOID" } }),
-        db.invoiceEvent.createMany({ data: voidable.map((invoiceId) => ({ invoiceId, type: "VOID", note: "Cancelled in bulk" })) }),
-      ]);
+      voidable = await db.$transaction(async (tx) => {
+        // Re-check the status as part of the write, so an invoice paid a moment ago isn't cancelled.
+        const still = (await tx.invoice.findMany({ where: { id: { in: voidable }, businessId: business.id, status: { notIn: ["VOID", "PAID"] } }, select: { id: true } })).map((i) => i.id);
+        await tx.invoice.updateMany({ where: { id: { in: still }, status: { notIn: ["VOID", "PAID"] } }, data: { status: "VOID" } });
+        await tx.invoiceEvent.createMany({ data: still.map((invoiceId) => ({ invoiceId, type: "VOID", note: "Cancelled in bulk" })) });
+        return still;
+      });
     }
+    const skipped = invoices.length - voidable.length;
     revalidatePath("/app/invoices");
     revalidatePath("/app");
     return { ok: voidable.length > 0, message: `Cancelled ${plural(voidable.length)}.${skipped ? ` ${plural(skipped)} already paid or cancelled ${skipped === 1 ? "was" : "were"} left as ${skipped === 1 ? "it was" : "they were"}.` : ""}` };

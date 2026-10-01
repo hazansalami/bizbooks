@@ -5,12 +5,14 @@ import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { Prisma } from "@/generated/prisma/client";
 import { createSession, deleteSession } from "@/lib/session";
 import { fieldErrors, randomToken } from "@/lib/utils";
 import { escapeHtml, layout, sendEmail } from "@/lib/email";
 import { siteUrl } from "@/lib/site-url";
 import type { FormState } from "@/components/form-bits";
 import { TERMS_VERSION } from "@/lib/legal";
+import { clientIp, recent, record } from "@/lib/rate-limit";
 
 const SignupSchema = z.object({
   fullName: z.string().trim().min(2, "Enter your name."),
@@ -34,13 +36,23 @@ export async function signup(_: FormState, form: FormData): Promise<FormState> {
   if (await db.user.findUnique({ where: { email: d.email } })) {
     return { errors: { email: "There's already an account with this email. Log in instead." }, values };
   }
-  const user = await db.user.create({
-    data: {
-      email: d.email, fullName: d.fullName, passwordHash: await bcrypt.hash(d.password, 10), termsAcceptedAt: new Date(), termsVersion: TERMS_VERSION,
-      signupRef: String(form.get("ref") ?? "").slice(0, 40) || null,
-    },
-  });
-  await createSession({ userId: user.id });
+  let userId: string;
+  try {
+    ({ id: userId } = await db.user.create({
+      data: {
+        email: d.email, fullName: d.fullName, passwordHash: await bcrypt.hash(d.password, 10), termsAcceptedAt: new Date(), termsVersion: TERMS_VERSION,
+        signupRef: String(form.get("ref") ?? "").slice(0, 40) || null,
+      },
+      select: { id: true },
+    }));
+  } catch (e) {
+    // A double-submitted form: the first request already created this account.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return { errors: { email: "There's already an account with this email. Log in instead." }, values };
+    }
+    throw e;
+  }
+  await createSession({ userId });
   redirect("/onboarding");
 }
 
@@ -48,9 +60,15 @@ export async function login(_: FormState, form: FormData): Promise<FormState> {
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const password = String(form.get("password") ?? "");
   const next = String(form.get("next") ?? "");
+  // Slow down password guessing: 5 wrong tries on one account, or 20 from one address, in 15 minutes.
+  const ip = await clientIp();
+  if ((await recent("LOGIN_FAIL_EMAIL", email, 15)) >= 5 || (await recent("LOGIN_FAIL_IP", ip, 15)) >= 20) {
+    return { message: "Too many attempts. Wait 15 minutes and try again, or reset your password.", values: { email } };
+  }
   const user = email ? await db.user.findUnique({ where: { email } }) : null;
   // Same message either way, so the form doesn't reveal which emails have accounts.
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+    await Promise.all([record("LOGIN_FAIL_EMAIL", email), record("LOGIN_FAIL_IP", ip)]);
     return { message: "That email and password don't match. Check them and try again.", values: { email } };
   }
   await db.user.update({ where: { id: user.id }, data: { lastSeenAt: new Date() } });

@@ -5,8 +5,8 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { createInvoice, loadFullInvoice, markSent, publicInvoiceUrl } from "@/lib/invoices";
 import { startInvoiceCheckout } from "@/lib/checkout";
-import { computeTotals, naira, parseAmount, round2 } from "@/lib/money";
-import { layout, sendEmail } from "@/lib/email";
+import { computeTotals, money, parseAmount, round2 } from "@/lib/money";
+import { layout, sendEmail, escapeHtml as esc } from "@/lib/email";
 import { siteUrl } from "@/lib/site-url";
 import { addDays, str } from "@/lib/utils";
 import type { FormState } from "@/components/form-bits";
@@ -23,8 +23,8 @@ export async function payNow(_: FormState, form: FormData): Promise<FormState> {
   if (!z.email().safeParse(email).success) {
     return { errors: { email: "Enter your email so the payment company can send your receipt." }, values: { email } };
   }
-  // Remember it for next time, but never overwrite an address the business already saved.
-  if (!inv.customer.email) await db.customer.update({ where: { id: inv.customerId }, data: { email } });
+  // Used for this checkout's receipt only. It isn't saved on the client: anyone holding the link could type
+  // an address here, and the business's future invoices and reminders would then go to it.
   const r = await startInvoiceCheckout(inv, email);
   if ("error" in r) {
     // The gateway's own wording ("Invalid key") means nothing to a customer; keep it for the logs.
@@ -52,19 +52,19 @@ export async function claimTransfer(_: FormState, form: FormData): Promise<FormS
   if (pending >= 3) return { ok: true, message: `${inv.business.name} already has your message and will confirm soon.` };
 
   await db.paymentClaim.create({ data: { invoiceId: inv.id, payerName, amount, note: str(form, "note") || null } });
-  await db.invoiceEvent.create({ data: { invoiceId: inv.id, type: "CLAIM", note: `${payerName}: ${naira(amount)}` } });
+  await db.invoiceEvent.create({ data: { invoiceId: inv.id, type: "CLAIM", note: `${payerName}: ${money(amount, inv.currency)}` } });
 
   const to = inv.business.email;
   if (to) {
     const { html, text } = layout({
-      heading: `${inv.customer.name} says they've paid ${naira(amount)}`,
+      heading: `${inv.customer.name} says they've paid ${money(amount, inv.currency)}`,
       paragraphs: [
-        `They sent a transfer for invoice ${inv.number} from an account named <strong>${payerName.replace(/[<>&]/g, "")}</strong>.`,
+        `They sent a transfer for invoice ${esc(inv.number)} from an account named <strong>${esc(payerName)}</strong>.`,
         "Check your bank app. When you see it, confirm it in BizBooks and the invoice updates.",
       ],
       button: { label: "Confirm payment", href: new URL(`/app/invoices/${inv.id}`, siteUrl()).toString() },
     });
-    await sendEmail({ to, subject: `Check your bank: ${naira(amount)} from ${inv.customer.name}`, html, text });
+    await sendEmail({ to, subject: `Check your bank: ${money(amount, inv.currency)} from ${inv.customer.name}`, html, text });
   }
   return { ok: true, message: `Thank you. We've told ${inv.business.name}. They'll confirm once it shows in their account.` };
 }
@@ -80,10 +80,13 @@ export async function acceptQuote(_: FormState, form: FormData): Promise<FormSta
   const name = str(form, "acceptedBy");
   if (name.length < 2) return { errors: { acceptedBy: "Enter your name so they know who approved it." }, values: { acceptedBy: name } };
 
-  await db.invoice.update({
-    where: { id: quote.id },
-    data: { status: "ACCEPTED", acceptedAt: new Date(), acceptedBy: name, events: { create: { type: "ACCEPTED", note: `Accepted online by ${name}` } } },
+  // Only one acceptance wins: a double tap (or two people at the client) mustn't raise two deposit invoices.
+  const accepted = await db.invoice.updateMany({
+    where: { id: quote.id, status: { in: ["SENT", "DRAFT"] } },
+    data: { status: "ACCEPTED", acceptedAt: new Date(), acceptedBy: name },
   });
+  if (accepted.count !== 1) return { message: "This quote has already been accepted or closed." };
+  await db.invoiceEvent.create({ data: { invoiceId: quote.id, type: "ACCEPTED", note: `Accepted online by ${name}` } });
 
   let depositToken: string | null = null;
   if (quote.depositPercent) {
@@ -93,6 +96,8 @@ export async function acceptQuote(_: FormState, form: FormData): Promise<FormSta
       businessId: quote.businessId, customerId: quote.customerId, kind: "INVOICE", issueDate: new Date(), dueDate: addDays(new Date(), 3),
       lines: [{ description: `Deposit (${quote.depositPercent}%) for quote ${quote.number}`, quantity: 1, unitPrice: amount }],
       discount: 0, vatRate: quote.vatRate, whtRate: quote.whtRate, notes: null, depositForId: quote.id, poNumber: quote.poNumber,
+      // Same currency and rate as the quote: a $10,000 quote's 50% deposit is $5,000, not ₦5,000.
+      currency: quote.currency, exchangeRate: quote.exchangeRate,
     });
     await markSent(dep.id, "Raised when the client accepted the quote online");
     depositToken = dep.publicToken;
@@ -102,7 +107,7 @@ export async function acceptQuote(_: FormState, form: FormData): Promise<FormSta
     const { html, text } = layout({
       heading: `${quote.customer.name} accepted quote ${quote.number}`,
       paragraphs: [
-        `${name.replace(/[<>&]/g, "")} approved your quote for <strong>${naira(quote.total)}</strong>.`,
+        `${esc(name)} approved your quote for <strong>${money(quote.total, quote.currency)}</strong>.`,
         quote.depositPercent ? `We've sent them a ${quote.depositPercent}% deposit invoice to pay now. You'll be told when it's paid.` : "Turn it into an invoice when you're ready to bill.",
       ],
       button: { label: "Open the quote", href: new URL(`/app/invoices/${quote.id}`, siteUrl()).toString() },

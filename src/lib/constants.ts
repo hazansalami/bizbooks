@@ -37,6 +37,8 @@ export const PLANS = {
 } as const;
 
 export const FREE_RECURRING_LIMIT = 2;
+/** Invoice emails a business can send from the Email dialog in 24 hours (anti-spam). */
+export const EMAIL_CAP = { daily: 200, newAccount: 30 } as const;
 export const FREE_RECURRING_EXPENSE_LIMIT = 3;
 export const FREE_PAYROLL_LIMIT = 3;
 export const RENEWAL_GRACE_DAYS = 5;

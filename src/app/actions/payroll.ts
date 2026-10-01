@@ -5,13 +5,13 @@ import { grantTrialBonus } from "@/lib/growth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireBusiness } from "@/lib/auth";
+import { requireBusiness, type CurrentBusiness } from "@/lib/auth";
 import { isPro } from "@/lib/plan";
 import { computePay, payDateFor, periodLabel } from "@/lib/payroll";
 import { parseAmount, round2 } from "@/lib/money";
 import { NUBAN } from "@/lib/business";
 import { FREE_PAYROLL_LIMIT } from "@/lib/constants";
-import { layout, sendEmail } from "@/lib/email";
+import { layout, sendEmail, escapeHtml as esc } from "@/lib/email";
 import { siteUrl } from "@/lib/site-url";
 import { dateOrNull, randomToken, str } from "@/lib/utils";
 import type { FormState } from "@/components/form-bits";
@@ -64,12 +64,19 @@ export async function saveEmployee(_: FormState, form: FormData): Promise<FormSt
 export async function setEmployeeStatus(form: FormData) {
   const { business } = await requireBusiness();
   const status = str(form, "status") === "LEFT" ? "LEFT" : "ACTIVE";
+  // Bringing someone back counts towards the Free plan's limit, same as adding them.
+  if (status === "ACTIVE" && !isPro(business) && (await db.employee.count({ where: { businessId: business.id, status: "ACTIVE" } })) >= FREE_PAYROLL_LIMIT) {
+    redirect(`/app/payroll/team?error=limit`);
+  }
   await db.employee.updateMany({ where: { id: str(form, "id"), businessId: business.id }, data: { status } });
   revalidatePath("/app/payroll/team");
 }
 
-async function fillRun(runId: string, businessId: string) {
-  const employees = await db.employee.findMany({ where: { businessId, status: "ACTIVE" }, orderBy: { fullName: "asc" } });
+/** On Free, a pay run covers the first people added, up to the Free limit (the rest wait for Pro). */
+async function fillRun(runId: string, business: CurrentBusiness) {
+  const businessId = business.id;
+  const everyone = await db.employee.findMany({ where: { businessId, status: "ACTIVE" }, orderBy: { createdAt: "asc" } });
+  const employees = (isPro(business) ? everyone : everyone.slice(0, FREE_PAYROLL_LIMIT)).sort((a, b) => a.fullName.localeCompare(b.fullName));
   const items = employees.map((e) => {
     const p = computePay(e);
     return {
@@ -100,7 +107,7 @@ export async function createPayRun(form: FormData) {
   const existing = await db.payRun.findUnique({ where: { businessId_period: { businessId: business.id, period } } });
   if (existing) redirect(`/app/payroll/runs/${existing.id}`);
   const run = await db.payRun.create({ data: { businessId: business.id, period, payDate: payDateFor(period, business.payDay) } });
-  await fillRun(run.id, business.id);
+  await fillRun(run.id, business);
   redirect(`/app/payroll/runs/${run.id}`);
 }
 
@@ -116,7 +123,7 @@ export async function refreshPayRun(form: FormData) {
   if (run.status !== "DRAFT") return;
   const payDate = dateOrNull(form, "payDate");
   if (payDate) await db.payRun.update({ where: { id: run.id }, data: { payDate } });
-  await fillRun(run.id, business.id);
+  await fillRun(run.id, business);
   revalidatePath(`/app/payroll/runs/${run.id}`);
 }
 
@@ -135,12 +142,16 @@ export async function markPayRunPaid(form: FormData) {
     { category: "Pension (employer)", amount: run.pensionEmployer, note: `${label} employer pension contribution` },
     { category: "Contractors & freelancers", amount: contractorGross, note: `${label} contractor fees (gross, including WHT)` },
   ].filter((l) => l.amount > 0);
-  await db.$transaction([
-    db.expense.createMany({
+  const marked = await db.$transaction(async (tx) => {
+    // Claim the run first, so a double tap can't book the payroll expenses twice.
+    const claimed = await tx.payRun.updateMany({ where: { id: run.id, status: "DRAFT" }, data: { status: "PAID", paidAt: new Date() } });
+    if (claimed.count !== 1) return false;
+    await tx.expense.createMany({
       data: lines.map((l) => ({ businessId: business.id, date: run.payDate, amount: l.amount, category: l.category, vendor: "Payroll", note: l.note, payRunId: run.id })),
-    }),
-    db.payRun.update({ where: { id: run.id }, data: { status: "PAID", paidAt: new Date() } }),
-  ]);
+    });
+    return true;
+  });
+  if (!marked) return;
   await grantTrialBonus(business.id, "PAYROLL_OR_IMPORT");
   revalidatePath("/app/payroll");
   revalidatePath(`/app/payroll/runs/${run.id}`);
@@ -174,7 +185,7 @@ export async function emailPayslips(_: FormState, form: FormData): Promise<FormS
     if (!to) continue;
     const { html, text } = layout({
       heading: `Your ${periodLabel(run.period)} payslip`,
-      paragraphs: [`Hello ${item.fullName.split(" ")[0]}, your payslip from ${business.name} is ready.`],
+      paragraphs: [`Hello ${esc(item.fullName.split(" ")[0])}, your payslip from ${esc(business.name)} is ready.`],
       button: { label: "View payslip", href: new URL(`/payslip/${item.publicToken}`, siteUrl()).toString() },
       color: business.brandColor,
       footer: business.name,

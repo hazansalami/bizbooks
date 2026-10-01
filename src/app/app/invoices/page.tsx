@@ -38,8 +38,10 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
           <ButtonLink href="/app/invoices/new">New invoice</ButtonLink>
         </>}
       />
-      {/* One InvoiceList in every state, so its result message survives a bulk delete that empties the view. */}
+      {/* One InvoiceList in every state, so its result message survives a bulk delete that empties the view.
+          Keyed by the view: switching filter or search starts a fresh selection, so hidden invoices can't stay selected. */}
       <InvoiceList
+        key={`${filter}|${q}`}
         toolbar={anyAtAll && (
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <nav aria-label="Filter invoices" className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 py-1 sm:mx-0 sm:flex-wrap sm:px-0">

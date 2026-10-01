@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { Prisma } from "@/generated/prisma/client";
 import { requireUser } from "@/lib/auth";
 import { addBankAccount, NUBAN, saveGateway } from "@/lib/business";
 import { fieldErrors, str } from "@/lib/utils";
@@ -54,14 +55,19 @@ export async function saveBusinessStep(_: FormState, form: FormData): Promise<Fo
     await db.business.update({ where: { id: business.id }, data });
     await advance(business.id, 0);
   } else {
-    const created = await db.$transaction(async (tx) => {
-      const b = await tx.business.create({ data: { ...data, ownerId: user.id, onboardingStep: 1 } });
-      const [code, source] = (user.signupRef ?? "").split("|");
-      const referred = await attachReferral(tx, b.id, user.id, code, source);
-      await startTrial(tx, b.id, referred);
-      return b;
-    });
-    await ensureReferralCode(created.id, created.name);
+    try {
+      const created = await db.$transaction(async (tx) => {
+        const b = await tx.business.create({ data: { ...data, ownerId: user.id, onboardingStep: 1 } });
+        const [code, source] = (user.signupRef ?? "").split("|");
+        const referred = await attachReferral(tx, b.id, user.id, code, source);
+        await startTrial(tx, b.id, referred);
+        return b;
+      });
+      await ensureReferralCode(created.id, created.name);
+    } catch (e) {
+      // A double-submitted first step: the other request already created the business, so carry on.
+      if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;
+    }
   }
   go(1);
   return {};
