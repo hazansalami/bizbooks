@@ -25,3 +25,16 @@ export function renewalPrice(b: PlanFields, months: 1 | 12, now = new Date()) {
   const discounted = b.discountPercent > 0 && b.discountUntil && b.discountUntil > now && months === 1;
   return discounted ? Math.round(base * (1 - b.discountPercent / 100)) : base;
 }
+
+/** Pro that's actually been paid for and is still running (not a trial, referral reward or admin grant). */
+export function isPaidPro(b: { paidUntil?: Date | null }, now = new Date()) {
+  return !!b.paidUntil && b.paidUntil > now;
+}
+
+/**
+ * The "Sent with BizBooks" line on invoices and invoice emails. It comes off only while paid-for Pro is
+ * running; free Pro (trial, referral months, admin grants) keeps it. Paying businesses can opt back in.
+ */
+export function showsBranding(b: { paidUntil?: Date | null; showReferralFooter?: boolean }, now = new Date()) {
+  return !isPaidPro(b, now) || !!b.showReferralFooter;
+}

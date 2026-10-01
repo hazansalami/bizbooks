@@ -1,7 +1,7 @@
 import { Gift, Mail, MessageCircle, Sparkles } from "lucide-react";
 import { requireBusiness } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { isPro } from "@/lib/plan";
+import { isPaidPro, isPro } from "@/lib/plan";
 import { siteUrl } from "@/lib/site-url";
 import { REFERRAL, TRIAL, LIFETIME_PRO_UNTIL } from "@/lib/constants";
 import { setReferralFooter } from "@/app/actions/referrals";
@@ -113,11 +113,11 @@ export default async function ReferPage() {
         )}
       </Panel>
 
-      {isPro(business) && (
+      {isPaidPro(business) ? (
         <Panel className="mt-5 p-5 sm:p-6">
           <h2 className="text-lg">Your invoices</h2>
           <p className="mt-1 text-sm text-ink-soft">
-            On Pro, your invoices carry no {`"`}Sent with BizBooks{`"`} line. Turn it back on to earn from the businesses you invoice; it&apos;s a small line at the bottom.
+            With paid Pro, your invoices carry no {`"`}Sent with BizBooks{`"`} line. Turn it back on to earn from the businesses you invoice; it&apos;s a small line at the bottom.
           </p>
           <form action={setReferralFooter} className="mt-3">
             <input type="hidden" name="on" value={business.showReferralFooter ? "0" : "1"} />
@@ -126,6 +126,11 @@ export default async function ReferPage() {
             </button>
           </form>
         </Panel>
+      ) : (
+        <p className="mt-5 text-sm text-muted">
+          Your invoices carry a small {`"`}Sent with BizBooks{`"`} line with your referral link, so businesses you invoice can join through you.
+          {isPro(business) ? " It comes off while you're on paid Pro." : " Paid Pro removes it."}
+        </p>
       )}
     </>
   );
