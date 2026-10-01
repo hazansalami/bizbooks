@@ -46,10 +46,10 @@ export function PaymentsSetup({ banks, account, hasRc, fee }: {
               {account.reviewNote} We check these by hand, usually within one working day. Online payments are paused meanwhile; clients can still pay by bank transfer.
             </p>
           )}
-          {account.status === "SUSPENDED" && account.reviewNote && <p className="mt-2 text-sm text-danger">{account.reviewNote}</p>}
+          {(account.status === "SUSPENDED" || account.status === "DISABLED") && account.reviewNote && <p className="mt-2 text-sm text-danger">{account.reviewNote}</p>}
           <div className="mt-3 flex flex-wrap gap-2">
             {!editing && account.status !== "SUSPENDED" && <button type="button" onClick={() => setEditing(true)} className={buttonClass("secondary", "sm")}>Change payout account</button>}
-            {(account.status === "ACTIVE" || account.status === "DISABLED") && (
+            {(account.status === "ACTIVE" || (account.status === "DISABLED" && !account.reviewNote)) && (
               <form action={setPaymentsOn}>
                 <input type="hidden" name="on" value={account.status === "ACTIVE" ? "0" : "1"} />
                 <button className={buttonClass("ghost", "sm")}>{account.status === "ACTIVE" ? "Turn off" : "Turn back on"}</button>

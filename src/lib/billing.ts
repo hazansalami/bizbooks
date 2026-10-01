@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "./db";
 import { addMonths } from "./utils";
+import { isPro, isTrial } from "./plan";
 
 /** Idempotent: a second call for the same payment (redirect + webhook) changes nothing. */
 export async function activatePro(platformPaymentId: string) {
@@ -19,4 +20,15 @@ export async function activatePro(platformPaymentId: string) {
       data: { plan: "PRO", proUntil, paidUntil: proUntil, cancelAtEnd: false, renewalNoticeAt: null },
     });
   });
+}
+
+type OfferBusiness = Parameters<typeof isPro>[0] & { id: string };
+
+/**
+ * Save offers (a discount or a pause) are for running, non-trial Pro plans, and each one only once:
+ * repeating them (a pause on top of a pause, or a fresh discount every few months) would mint free time.
+ */
+export async function saveOfferAllowed(b: OfferBusiness, offer: "DISCOUNT" | "PAUSE", now = new Date()) {
+  if (!isPro(b, now) || isTrial(b) || (b.pausedUntil && b.pausedUntil > now)) return false;
+  return (await db.cancellationFeedback.count({ where: { businessId: b.id, outcome: `SAVED_${offer}` } })) === 0;
 }

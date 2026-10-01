@@ -1,5 +1,5 @@
 import "server-only";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "./auth";
 import { db } from "./db";
 import { isPro, inGracePeriod } from "./plan";
@@ -7,7 +7,7 @@ import { addDays } from "./utils";
 
 /*
   The platform owner's dashboard at /admin. Access is an allowlist in ADMIN_EMAILS (comma-separated),
-  so there's no admin flag to escalate through the database. Everyone else gets a 404, which hides the page exists.
+  so there's no admin flag to escalate through the database, and the address must be confirmed by email. Everyone else gets a 404, which hides the page exists.
 */
 
 export function adminEmails() {
@@ -17,6 +17,8 @@ export function adminEmails() {
 export async function requireAdmin() {
   const user = await getCurrentUser();
   if (!user || !adminEmails().includes(user.email.toLowerCase())) notFound();
+  // Signing up doesn't prove the address is yours, so an allowlisted email only counts once confirmed.
+  if (!user.emailVerifiedAt) redirect("/verify-email?next=/admin");
   return user;
 }
 

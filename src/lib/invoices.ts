@@ -22,15 +22,30 @@ export function payUrl(token: string) {
   return new URL(`/pay/${token}`, siteUrl()).toString();
 }
 
+/**
+ * The next free number for this business. The counter usually is free, but imported invoices or a prefix
+ * switched back can already hold it, so taken numbers are skipped (and the counter moves past them).
+ */
 async function nextNumber(tx: Tx, businessId: string, kind: "INVOICE" | "QUOTE") {
-  const b = await tx.business.update({
-    where: { id: businessId },
-    data: kind === "INVOICE" ? { nextInvoiceNo: { increment: 1 } } : { nextQuoteNo: { increment: 1 } },
-    select: { invoicePrefix: true, quotePrefix: true, nextInvoiceNo: true, nextQuoteNo: true },
-  });
-  const n = kind === "INVOICE" ? b.nextInvoiceNo - 1 : b.nextQuoteNo - 1;
-  const prefix = kind === "INVOICE" ? b.invoicePrefix : b.quotePrefix;
-  return `${prefix}-${String(n).padStart(4, "0")}`;
+  for (let tries = 0; ; tries++) {
+    const b = await tx.business.update({
+      where: { id: businessId },
+      data: kind === "INVOICE" ? { nextInvoiceNo: { increment: 1 } } : { nextQuoteNo: { increment: 1 } },
+      select: { invoicePrefix: true, quotePrefix: true, nextInvoiceNo: true, nextQuoteNo: true },
+    });
+    const n = kind === "INVOICE" ? b.nextInvoiceNo - 1 : b.nextQuoteNo - 1;
+    const prefix = kind === "INVOICE" ? b.invoicePrefix : b.quotePrefix;
+    const number = `${prefix}-${String(n).padStart(4, "0")}`;
+    const taken = await tx.invoice.findFirst({ where: { businessId, kind, number }, select: { id: true } });
+    if (!taken) return number;
+    if (tries > 200) throw new Error(`No free ${kind.toLowerCase()} number for business ${businessId}`);
+    // A long run of taken numbers (e.g. 2,000 imported invoices): jump straight past the highest one.
+    if (tries === 20) {
+      const rows = await tx.invoice.findMany({ where: { businessId, kind, number: { startsWith: `${prefix}-` } }, select: { number: true } });
+      const max = Math.max(n, ...rows.map((r) => Number(r.number.slice(prefix.length + 1))).filter(Number.isFinite));
+      await tx.business.update({ where: { id: businessId }, data: kind === "INVOICE" ? { nextInvoiceNo: max + 1 } : { nextQuoteNo: max + 1 } });
+    }
+  }
 }
 
 export type NewInvoice = {

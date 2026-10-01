@@ -123,7 +123,8 @@ export async function resetPassword(_: FormState, form: FormData): Promise<FormS
     const used = await tx.passwordReset.updateMany({ where: { id: reset.id, usedAt: null }, data: { usedAt: now } });
     if (used.count !== 1) return false;
     await tx.passwordReset.updateMany({ where: { userId: reset.userId, usedAt: null }, data: { usedAt: now } });
-    await tx.user.update({ where: { id: reset.userId }, data: { passwordHash: await bcrypt.hash(password, 10), passwordChangedAt: now, lastSeenAt: now } });
+    // The reset link reached their inbox, which also confirms the email address.
+    await tx.user.update({ where: { id: reset.userId }, data: { passwordHash: await bcrypt.hash(password, 10), passwordChangedAt: now, lastSeenAt: now, emailVerifiedAt: now } });
     return true;
   });
   if (!claimed) return { message: "This reset link was already used. Request a new one." };

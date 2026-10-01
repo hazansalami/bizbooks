@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { requireBusiness } from "@/lib/auth";
 import { startCheckout } from "@/lib/gateways";
 import { renewalPrice } from "@/lib/plan";
+import { saveOfferAllowed } from "@/lib/billing";
 import { siteUrl } from "@/lib/site-url";
 import { addDays, addMonths, str } from "@/lib/utils";
 import { CANCEL_REASONS, MAX_PAUSE_MONTHS, SAVE_OFFER_DISCOUNT, SAVE_OFFER_MONTHS } from "@/lib/constants";
@@ -48,7 +49,7 @@ export async function acceptSaveOffer(form: FormData) {
   const details = str(form, "details") || null;
   if (!OFFERS.includes(offer)) redirect("/app/settings/billing");
   const now = new Date();
-
+  if ((offer === "DISCOUNT" || offer === "PAUSE") && !(await saveOfferAllowed(business, offer, now))) redirect("/app/settings/billing?error=offer");
   if (offer === "DISCOUNT") {
     await db.business.update({ where: { id: business.id }, data: { discountPercent: SAVE_OFFER_DISCOUNT, discountUntil: addMonths(now, SAVE_OFFER_MONTHS), cancelAtEnd: false } });
   }
