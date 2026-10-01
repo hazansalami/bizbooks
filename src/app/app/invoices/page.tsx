@@ -26,7 +26,9 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
   if (filter === "draft") where.status = "DRAFT";
   if (q) where.OR = [{ number: { contains: q, mode: "insensitive" } }, { customer: { name: { contains: q, mode: "insensitive" } } }];
 
-  const invoices = await db.invoice.findMany({ where, include: { customer: true, payments: { select: { reference: true } } }, orderBy: [{ issueDate: "desc" }, { createdAt: "desc" }], take: 100 });
+  const invoices = await db.invoice.findMany({ where, include: { customer: true, _count: { select: { payments: true } } }, orderBy: [{ issueDate: "desc" }, { createdAt: "desc" }], take: 100 });
+  // Which of these were paid online (only needed for the delete warning), counted in the database.
+  const online = new Set((await db.payment.groupBy({ by: ["invoiceId"], where: { invoiceId: { in: invoices.map((i) => i.id) }, reference: { not: null } } })).map((g) => g.invoiceId));
   const anyAtAll = invoices.length > 0 || (await db.invoice.count({ where: { businessId: business.id, kind: "INVOICE" } })) > 0;
 
   return (
@@ -77,7 +79,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
           const late = open ? daysBetween(inv.dueDate, now) : 0;
           const st = INVOICE_STATUS[inv.status] ?? INVOICE_STATUS.DRAFT;
           return {
-            id: inv.id, customer: inv.customer.name, status: inv.status, hasPayments: inv.amountPaid > 0 || inv.payments.length > 0, paidOnline: inv.payments.some((p) => p.reference),
+            id: inv.id, customer: inv.customer.name, status: inv.status, hasPayments: inv.amountPaid > 0 || inv._count.payments > 0, paidOnline: online.has(inv.id), foreign: inv.currency !== "NGN", deposit: !!inv.depositForId,
             sub: `${inv.number} · ${open ? `due ${formatDate(inv.dueDate)}` : formatDate(inv.issueDate)}`,
             amount: money(open ? balanceDue(inv) : inv.total, inv.currency),
             badge: late > 0 ? { label: `${late}d overdue`, tone: "danger" as const } : { label: st.label, tone: st.tone },

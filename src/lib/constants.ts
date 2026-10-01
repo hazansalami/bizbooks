@@ -202,6 +202,9 @@ export const REFERRAL = {
   qualifyWithinDays: 60,
   minInvoices: 3,
   minClients: 2,
+  // Without an online payment (a signal one person can't easily fake), only this many of a referrer's
+  // referrals qualify automatically; the rest wait for a quick check by BizBooks (status REVIEW).
+  autoQualifyWithoutPayment: 2,
   milestones: [
     { count: 3, label: "A year of Pro and a Partner badge", bonusMonths: 3 },
     { count: 10, label: "Pro free for life", lifetime: true },

@@ -63,6 +63,7 @@ export async function activatePayments(_: FormState, form: FormData): Promise<Fo
   const { business, user } = await requireBusiness({ allowOnboarding: true });
   const values = { bankCode: str(form, "bankCode"), accountNumber: str(form, "accountNumber").replace(/\D/g, "") };
   if (!paymentsEnabled()) return { message: "BizBooks Payments isn't available yet.", values };
+  if (!user.emailVerifiedAt) return { message: "Confirm your email address first: open the link we sent you (or send a new one from the banner at the top), then try again.", values };
   if (!business.rcNumber) return { message: "Add your CAC number (RC or BN) under Settings first. BizBooks Payments is for registered businesses.", values };
   if (str(form, "terms") !== "on") return { errors: { terms: "Please agree to the BizBooks Payments terms and fee." }, values };
   const bank = await bankFrom(form);

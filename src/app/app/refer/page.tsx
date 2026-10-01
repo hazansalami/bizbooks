@@ -14,6 +14,7 @@ export const metadata = { title: "Refer & earn" };
 const STATUS: Record<string, { label: string; tone: "brand" | "sun" | "neutral" | "danger" }> = {
   PENDING: { label: "Signed up", tone: "sun" },
   QUALIFIED: { label: "Reward earned", tone: "brand" },
+  REVIEW: { label: "Being checked", tone: "sun" },
   REJECTED: { label: "Not eligible", tone: "danger" },
   EXPIRED: { label: "Didn't get started", tone: "neutral" },
 };

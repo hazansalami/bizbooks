@@ -175,6 +175,9 @@ export async function emailInvoiceAction(_: FormState, form: FormData): Promise<
   if (!values.subject.trim()) return { errors: { subject: "Add a subject." }, values };
   if (!values.message.trim()) return { errors: { message: "Add a message." }, values };
   if (values.message.length > 5000 || values.subject.length > 200) return { message: "That message is too long. Keep it under 5,000 characters.", values };
+  // Emails go out in the business's name, so the owner must have confirmed their own address first.
+  const { user } = await requireBusiness();
+  if (!user.emailVerifiedAt) return { message: "Confirm your own email address first (we've sent you a link), then you can email invoices. Sharing by WhatsApp or link works now.", values };
   // A daily cap per business keeps the dialog from being used to send bulk mail from BizBooks' domain.
   // New accounts start lower; real use is far below either limit.
   const newAccount = business.createdAt > new Date(Date.now() - 7 * 86_400_000) && !isPaidPro(business);
@@ -185,7 +188,6 @@ export async function emailInvoiceAction(_: FormState, form: FormData): Promise<
   if (sentToday >= cap) return { message: `You've sent ${cap} invoice emails in the last 24 hours, the most we allow${newAccount ? " for a new account" : ""}. Share by WhatsApp or link for now, or try again tomorrow.`, values };
   // Remember the address on the client if they didn't have one.
   if (!full!.customer.email) await db.customer.update({ where: { id: full!.customerId }, data: { email: to[0] } });
-  const { user } = await requireBusiness();
   const cc = str(form, "copyMe") === "on" ? [full!.business.email || user.email].filter((e) => !to.includes(e.toLowerCase())) : undefined;
   const r = await emailInvoice(full!, kind, { to, cc, subject: values.subject, message: values.message });
   revalidatePath(`/app/invoices/${inv.id}`);
@@ -249,24 +251,23 @@ export async function voidInvoice(form: FormData) {
   revalidatePath(`/app/invoices/${inv.id}`);
 }
 
-/** Delete any invoice, paid or not, along with its payments. The page asks twice before calling this. */
+/** The "Bank charges" expenses booked when BizBooks Payments settled these invoices (see lib/checkout.ts). */
+function feeExpensesFor(businessId: string, numbers: string[]) {
+  return db.expense.deleteMany({ where: { businessId, vendor: "BizBooks Payments", OR: numbers.map((n) => ({ note: { startsWith: `Payment fees on ${n}:` } })) } });
+}
+
+/** Delete any invoice, paid or not, along with its payments and their fees. The page asks twice before calling this. */
 export async function deleteInvoice(form: FormData) {
   const { inv, business } = await ownInvoice(str(form, "id"));
   await db.$transaction([
     db.payment.deleteMany({ where: { invoiceId: inv.id, businessId: business.id } }),
+    feeExpensesFor(business.id, [inv.number]),
     db.invoice.delete({ where: { id: inv.id } }),
   ]);
   revalidatePath("/app/invoices");
   revalidatePath("/app/payments");
   revalidatePath("/app");
   redirect(inv.kind === "QUOTE" ? "/app/quotes" : "/app/invoices");
-}
-
-export async function deleteDraft(form: FormData) {
-  const { inv } = await ownInvoice(str(form, "id"));
-  if (inv.status === "DRAFT" && inv.amountPaid === 0) await db.invoice.delete({ where: { id: inv.id } });
-  revalidatePath("/app/invoices");
-  redirect("/app/invoices");
 }
 
 export async function duplicateInvoice(form: FormData) {
@@ -311,6 +312,9 @@ export async function convertQuote(form: FormData) {
  * recorded against them (that would silently change cash and income figures). "void" cancels them and
  * keeps the record, which is the safer choice for anything a client or the tax office may have seen.
  */
+/** Bulk "mark as paid" records payments one by one, so a batch is capped to stay inside the request time limit. */
+const BULK_PAID_LIMIT = 100;
+
 export async function bulkInvoiceAction(_: FormState, form: FormData): Promise<FormState> {
   const { business } = await requireBusiness();
   let ids: string[] = [];
@@ -321,7 +325,7 @@ export async function bulkInvoiceAction(_: FormState, form: FormData): Promise<F
   const op = str(form, "op");
   const invoices = await db.invoice.findMany({
     where: { id: { in: ids }, businessId: business.id, kind: "INVOICE" },
-    select: { id: true, status: true, amountPaid: true, payments: { select: { reference: true } } },
+    select: { id: true, number: true, status: true, amountPaid: true, currency: true, total: true, whtAmount: true, payments: { select: { reference: true, viaPlatform: true } } },
   });
   const plural = (n: number) => `${n} invoice${n === 1 ? "" : "s"}`;
 
@@ -339,8 +343,9 @@ export async function bulkInvoiceAction(_: FormState, form: FormData): Promise<F
       const removed = withPayments
         ? (await db.$transaction([
             db.payment.deleteMany({ where: { invoiceId: { in: deletable }, businessId: business.id } }),
+            feeExpensesFor(business.id, invoices.filter((i) => deletable.includes(i.id) && i.payments.some((p) => p.viaPlatform)).map((i) => i.number)),
             db.invoice.deleteMany({ where }),
-          ]))[1]
+          ]))[2]
         : await db.invoice.deleteMany({ where: { ...where, amountPaid: 0, payments: { none: {} } } });
       deleted = removed.count;
     }
@@ -377,20 +382,31 @@ export async function bulkInvoiceAction(_: FormState, form: FormData): Promise<F
     // Record a payment for each invoice's outstanding balance, so cash flow and reports stay right.
     const method = str(form, "method") in PAYMENT_METHODS ? str(form, "method") : "BANK_TRANSFER";
     const paidAt = dateOrNull(form, "paidAt") ?? new Date();
-    const open = await db.invoice.findMany({ where: { id: { in: invoices.map((i) => i.id) }, status: { notIn: ["VOID", "PAID"] } } });
+    const open = invoices.filter((i) => !["VOID", "PAID"].includes(i.status) && balanceDue(i) > 0);
+    // Foreign-currency payments need the day's exchange rate, so those are recorded one at a time.
+    const naira = open.filter((i) => i.currency === "NGN");
+    const foreign = open.length - naira.length;
+    // One at a time (each payment is its own small transaction, kind to small connection pools), so cap the
+    // batch to stay well inside the request time limit.
+    const batch = naira.slice(0, BULK_PAID_LIMIT);
     let done = 0;
-    for (const inv of open) {
-      const due = balanceDue(inv);
-      if (due <= 0) continue;
-      // One at a time: each payment is its own small transaction (kind to small connection pools).
-      const r = await applyPayment(inv.id, { amount: due, method, paidAt, note: "Marked paid in bulk" });
+    for (const inv of batch) {
+      const r = await applyPayment(inv.id, { amount: balanceDue(inv), method, paidAt, note: "Marked paid in bulk" });
       if (r.ok) done++;
     }
-    const skipped = invoices.length - done;
+    const closed = invoices.length - open.length;
     revalidatePath("/app/invoices");
     revalidatePath("/app/payments");
     revalidatePath("/app");
-    return { ok: done > 0, message: `Marked ${plural(done)} as paid on ${formatDate(paidAt)}.${skipped ? ` ${plural(skipped)} already paid or cancelled ${skipped === 1 ? "was" : "were"} skipped.` : ""}` };
+    return {
+      ok: done > 0,
+      message: [
+        `Marked ${plural(done)} as paid on ${formatDate(paidAt)}.`,
+        closed ? `${plural(closed)} already paid or cancelled ${closed === 1 ? "was" : "were"} skipped.` : "",
+        foreign ? `${plural(foreign)} in other currencies ${foreign === 1 ? "was" : "were"} left: record ${foreign === 1 ? "it" : "those"} from the invoice page so you can enter the day's rate.` : "",
+        naira.length > batch.length ? `${plural(naira.length - batch.length)} more ${naira.length - batch.length === 1 ? "is" : "are"} still open; run it again for the rest.` : "",
+      ].filter(Boolean).join(" "),
+    };
   }
   return { message: "Choose what to do with the selected invoices." };
 }

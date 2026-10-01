@@ -53,7 +53,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             {business.logo ? <img src={business.logo} alt="" className="size-full bg-white object-contain" /> : initials(business.name)}
           </Link>
         </header>
-        <main className="mx-auto max-w-5xl px-4 pb-28 pt-6 sm:px-6 lg:pb-12 lg:pt-10">{children}</main>
+        <main className="mx-auto max-w-5xl px-4 pb-28 pt-6 sm:px-6 lg:pb-12 lg:pt-10">
+          {!user.emailVerifiedAt && (
+            <p className="no-print mb-5 rounded-xl border border-sun/40 bg-sun-wash px-4 py-3 text-sm text-sun-ink">
+              Confirm your email ({user.email}) to email invoices from BizBooks and take card payments.{" "}
+              <Link href="/verify-email?next=/app" className="font-semibold underline">Send me the link</Link>
+            </p>
+          )}
+          {children}
+        </main>
       </div>
       <BottomNav />
       <InstallNudge variant="app" />

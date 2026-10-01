@@ -1,6 +1,7 @@
 import { checkReferral } from "@/lib/growth";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import { CheckCircle2, CircleAlert } from "lucide-react";
 import { db } from "@/lib/db";
 import { canPayOnline, loadFullInvoice } from "@/lib/invoices";
@@ -13,6 +14,8 @@ import { PrintButton } from "@/components/form-bits";
 import { InvoiceDocument } from "@/components/invoice-document";
 import { PayPanel } from "./pay-panel";
 import { QuoteAccept } from "./quote-accept";
+
+const LINK_PREVIEW_BOTS = /bot\b|bot\/|crawler|spider|preview|whatsapp|facebookexternalhit|slack|telegram|discord|skype|linkedin|twitter|google|bing|yahoo|outlook|microsoft office|safelinks|proofpoint|mimecast|barracuda|curl|wget|python|node-fetch|axios|headless/i;
 
 type Props = { params: Promise<{ token: string }>; searchParams: Promise<{ payment?: string }> };
 
@@ -38,9 +41,11 @@ export default async function PublicInvoice({ params, searchParams }: Props) {
   const inv = await load(token);
   if (!inv) notFound();
 
-  // Count the first view by anyone other than the owner.
+  // Count the first view by anyone other than the owner. Link previews (WhatsApp, email scanners, chat apps)
+  // fetch the page the moment it's shared, so they don't count as the client opening it.
   const viewer = await getCurrentUser();
-  if (!inv.viewedAt && viewer?.id !== inv.business.ownerId) {
+  const ua = (await headers()).get("user-agent") ?? "";
+  if (!inv.viewedAt && viewer?.id !== inv.business.ownerId && ua && !LINK_PREVIEW_BOTS.test(ua)) {
     await db.invoice.update({ where: { id: inv.id }, data: { viewedAt: new Date(), events: { create: { type: "VIEWED" } } } });
     if (inv.business.referredById) await checkReferral(inv.businessId);
   }
