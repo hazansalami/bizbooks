@@ -5,12 +5,12 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireBusiness } from "@/lib/auth";
 import { applyPayment, createInvoice, emailInvoice, loadFullInvoice, markSent, refreshInvoicePaid } from "@/lib/invoices";
-import { computeTotals, parseAmount, round2, type LineInput } from "@/lib/money";
+import { balanceDue, computeTotals, parseAmount, round2, type LineInput } from "@/lib/money";
 import { FREE_RECURRING_LIMIT, FREQUENCIES, PAYMENT_METHODS } from "@/lib/constants";
 import { advance } from "@/lib/recurring";
 import { isCurrency } from "@/lib/currency";
 import { isPro } from "@/lib/plan";
-import { dateOrNull, str } from "@/lib/utils";
+import { dateOrNull, formatDate, str } from "@/lib/utils";
 import { z } from "zod";
 import type { FormState } from "@/components/form-bits";
 
@@ -277,4 +277,70 @@ export async function convertQuote(form: FormData) {
     return n;
   });
   redirect(`/app/invoices/${created.id}?share=1`);
+}
+
+/**
+ * Bulk actions from the invoice list. "delete" removes invoices permanently, but never ones with money
+ * recorded against them (that would silently change cash and income figures). "void" cancels them and
+ * keeps the record, which is the safer choice for anything a client or the tax office may have seen.
+ */
+export async function bulkInvoiceAction(_: FormState, form: FormData): Promise<FormState> {
+  const { business } = await requireBusiness();
+  let ids: string[] = [];
+  try {
+    ids = (JSON.parse(str(form, "ids") || "[]") as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 500);
+  } catch {}
+  if (!ids.length) return { message: "Select at least one invoice." };
+  const op = str(form, "op");
+  const invoices = await db.invoice.findMany({
+    where: { id: { in: ids }, businessId: business.id, kind: "INVOICE" },
+    select: { id: true, status: true, amountPaid: true, _count: { select: { payments: true } } },
+  });
+  const plural = (n: number) => `${n} invoice${n === 1 ? "" : "s"}`;
+
+  if (op === "delete") {
+    const deletable = invoices.filter((i) => i.amountPaid === 0 && i._count.payments === 0).map((i) => i.id);
+    const kept = invoices.length - deletable.length;
+    if (deletable.length) await db.invoice.deleteMany({ where: { id: { in: deletable }, businessId: business.id } });
+    revalidatePath("/app/invoices");
+    revalidatePath("/app");
+    return {
+      ok: deletable.length > 0,
+      message: `Deleted ${plural(deletable.length)}.${kept ? ` ${plural(kept)} with payments recorded ${kept === 1 ? "was" : "were"} kept, so your books still match the money received. To remove ${kept === 1 ? "it" : "them"}, delete the payments on the invoice first.` : ""}`,
+    };
+  }
+
+  if (op === "void") {
+    const voidable = invoices.filter((i) => !["VOID", "PAID"].includes(i.status)).map((i) => i.id);
+    const skipped = invoices.length - voidable.length;
+    if (voidable.length) {
+      await db.$transaction([
+        db.invoice.updateMany({ where: { id: { in: voidable }, businessId: business.id }, data: { status: "VOID" } }),
+        db.invoiceEvent.createMany({ data: voidable.map((invoiceId) => ({ invoiceId, type: "VOID", note: "Cancelled in bulk" })) }),
+      ]);
+    }
+    revalidatePath("/app/invoices");
+    revalidatePath("/app");
+    return { ok: voidable.length > 0, message: `Cancelled ${plural(voidable.length)}.${skipped ? ` ${plural(skipped)} already paid or cancelled ${skipped === 1 ? "was" : "were"} left as ${skipped === 1 ? "it was" : "they were"}.` : ""}` };
+  }
+  if (op === "paid") {
+    // Record a payment for each invoice's outstanding balance, so cash flow and reports stay right.
+    const method = str(form, "method") in PAYMENT_METHODS ? str(form, "method") : "BANK_TRANSFER";
+    const paidAt = dateOrNull(form, "paidAt") ?? new Date();
+    const open = await db.invoice.findMany({ where: { id: { in: invoices.map((i) => i.id) }, status: { notIn: ["VOID", "PAID"] } } });
+    let done = 0;
+    for (const inv of open) {
+      const due = balanceDue(inv);
+      if (due <= 0) continue;
+      // One at a time: each payment is its own small transaction (kind to small connection pools).
+      const r = await applyPayment(inv.id, { amount: due, method, paidAt, note: "Marked paid in bulk" });
+      if (r.ok) done++;
+    }
+    const skipped = invoices.length - done;
+    revalidatePath("/app/invoices");
+    revalidatePath("/app/payments");
+    revalidatePath("/app");
+    return { ok: done > 0, message: `Marked ${plural(done)} as paid on ${formatDate(paidAt)}.${skipped ? ` ${plural(skipped)} already paid or cancelled ${skipped === 1 ? "was" : "were"} skipped.` : ""}` };
+  }
+  return { message: "Choose what to do with the selected invoices." };
 }

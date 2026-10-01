@@ -6,7 +6,8 @@ import { db } from "@/lib/db";
 import { balanceDue, money } from "@/lib/money";
 import { INVOICE_STATUS } from "@/lib/constants";
 import { cn, daysBetween, formatDate } from "@/lib/utils";
-import { Badge, ButtonLink, EmptyState, PageHeader } from "@/components/ui";
+import { ButtonLink, EmptyState, PageHeader } from "@/components/ui";
+import { InvoiceList } from "@/components/invoice-list";
 
 export const metadata = { title: "Invoices" };
 
@@ -68,27 +69,17 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
           {invoices.length === 0 ? (
             <p className="rounded-2xl border border-line bg-paper p-8 text-center text-muted">Nothing here. Try another filter.</p>
           ) : (
-            <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-paper">
-              {invoices.map((inv) => {
-                const open = ["SENT", "PARTIAL"].includes(inv.status);
-                const late = open ? daysBetween(inv.dueDate, now) : 0;
-                const st = INVOICE_STATUS[inv.status] ?? INVOICE_STATUS.DRAFT;
-                return (
-                  <li key={inv.id}>
-                    <Link href={`/app/invoices/${inv.id}`} className="flex items-center gap-3 px-4 py-3.5 hover:bg-canvas sm:px-5">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-semibold">{inv.customer.name}</p>
-                        <p className="text-sm text-muted">{inv.number} · {open ? `due ${formatDate(inv.dueDate)}` : formatDate(inv.issueDate)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="num font-bold">{money(open ? balanceDue(inv) : inv.total, inv.currency)}</p>
-                        {late > 0 ? <Badge tone="danger">{late}d overdue</Badge> : <Badge tone={st.tone}>{st.label}</Badge>}
-                      </div>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+            <InvoiceList rows={invoices.map((inv) => {
+              const open = ["SENT", "PARTIAL"].includes(inv.status);
+              const late = open ? daysBetween(inv.dueDate, now) : 0;
+              const st = INVOICE_STATUS[inv.status] ?? INVOICE_STATUS.DRAFT;
+              return {
+                id: inv.id, customer: inv.customer.name, status: inv.status, hasPayments: inv.amountPaid > 0,
+                sub: `${inv.number} · ${open ? `due ${formatDate(inv.dueDate)}` : formatDate(inv.issueDate)}`,
+                amount: money(open ? balanceDue(inv) : inv.total, inv.currency),
+                badge: late > 0 ? { label: `${late}d overdue`, tone: "danger" as const } : { label: st.label, tone: st.tone },
+              };
+            })} />
           )}
         </>
       )}
