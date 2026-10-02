@@ -56,7 +56,8 @@ export default async function AdminOverview() {
     () => db.paymentAccount.findMany({ where: { status: "PENDING_REVIEW" }, orderBy: { updatedAt: "asc" }, take: 20, include: { business: { select: { id: true, name: true, legalName: true, rcNumber: true } } } }),
     () => db.referral.groupBy({ by: ["status"], _count: { _all: true } }),
     () => db.referral.count({ where: { status: "QUALIFIED", qualifiedAt: { gte: d30 } } }),
-    () => db.referral.findMany({ orderBy: { createdAt: "desc" }, take: 12, include: { referrer: { select: { id: true, name: true } }, referred: { select: { id: true, name: true } } } }),
+    // Referrals waiting for a check come first, then the most recent.
+    () => db.referral.findMany({ orderBy: [{ status: "desc" }, { createdAt: "desc" }], where: { OR: [{ status: "REVIEW" }, { createdAt: { gte: d30 } }] }, take: 20, include: { referrer: { select: { id: true, name: true } }, referred: { select: { id: true, name: true } } } }),
     () => db.platformPayment.findMany({ where: { status: "PAID", business: { trialStartedAt: { not: null } } }, distinct: ["businessId"], select: { businessId: true } }),
   ] as const);
   const refBy = (st: string) => refStatus.find((g) => g.status === st)?._count._all ?? 0;
@@ -114,7 +115,7 @@ export default async function AdminOverview() {
         <Kpi label="On a Pro trial" value={trialing.length} hint={`${everTrialed} have started a trial`} tone="brand" />
         <Kpi label="Trial → paid" value={trialPayers.length} hint={`${pct(trialPayers.length, everTrialed)} of trials have paid`} />
         <Kpi label="Referrals qualified" value={refs30} hint={`last 30 days · ${refBy("QUALIFIED")} all time`} />
-        <Kpi label="Referrals pending" value={refBy("PENDING")} hint={`${refBy("REJECTED")} rejected · ${refBy("EXPIRED")} expired`} />
+        <Kpi label="Referrals pending" value={refBy("PENDING")} hint={`${refBy("REVIEW")} need review · ${refBy("REJECTED")} rejected · ${refBy("EXPIRED")} expired`} />
       </Section>
 
       <Section title="BizBooks Payments, last 30 days">
@@ -295,12 +296,12 @@ function ReferralList({ referrals }: { referrals: { id: string; status: string; 
             <span className="text-muted"> · {r.source === "INVOICE" ? "invoice link" : "shared link"} · {timeAgo(r.createdAt)}{r.reason ? ` · ${r.reason}` : ""}</span>
           </span>
           <span className="flex items-center gap-1">
-            <Badge tone={r.status === "QUALIFIED" ? "brand" : r.status === "REJECTED" ? "danger" : r.status === "PENDING" ? "sun" : "neutral"}>{r.status.toLowerCase()}</Badge>
-            {(r.status === "PENDING" || r.status === "REJECTED") && (
+            <Badge tone={r.status === "QUALIFIED" ? "brand" : r.status === "REJECTED" ? "danger" : r.status === "PENDING" || r.status === "REVIEW" ? "sun" : "neutral"}>{r.status === "REVIEW" ? "needs review" : r.status.toLowerCase()}</Badge>
+            {(r.status === "PENDING" || r.status === "REVIEW" || r.status === "REJECTED") && (
               <form action={adminReferralDecision} className="flex gap-1">
                 <input type="hidden" name="id" value={r.id} />
                 <button name="decision" value="approve" className="min-h-8 rounded-full border border-line-strong px-2.5 text-xs font-semibold hover:border-ink">Approve</button>
-                {r.status === "PENDING" && <button name="decision" value="reject" className="min-h-8 rounded-full border border-danger/40 px-2.5 text-xs font-semibold text-danger hover:bg-danger-wash">Reject</button>}
+                {(r.status === "PENDING" || r.status === "REVIEW") && <button name="decision" value="reject" className="min-h-8 rounded-full border border-danger/40 px-2.5 text-xs font-semibold text-danger hover:bg-danger-wash">Reject</button>}
               </form>
             )}
           </span>

@@ -13,6 +13,7 @@ import { siteUrl } from "@/lib/site-url";
 import type { FormState } from "@/components/form-bits";
 import { TERMS_VERSION } from "@/lib/legal";
 import { clientIp, recent, record } from "@/lib/rate-limit";
+import { sendVerificationEmail } from "@/lib/verify-email";
 
 const SignupSchema = z.object({
   fullName: z.string().trim().min(2, "Enter your name."),
@@ -53,6 +54,8 @@ export async function signup(_: FormState, form: FormData): Promise<FormState> {
     throw e;
   }
   await createSession({ userId });
+  // Confirms they own the address before BizBooks emails invoices or takes payments in the business's name.
+  await sendVerificationEmail({ id: userId, email: d.email, fullName: d.fullName }, "/app").catch(() => null);
   redirect("/onboarding");
 }
 

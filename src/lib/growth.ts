@@ -119,18 +119,29 @@ export async function checkReferral(referredBusinessId: string) {
   const sameBank = !!referred.paymentAccount && !!referrer.paymentAccount && referred.paymentAccount.accountNumber === referrer.paymentAccount.accountNumber;
   const reason = sameCac ? "Same CAC number as the referrer" : sameBank ? "Same payout account as the referrer" : sameDomain ? "Same company email domain as the referrer" : null;
 
-  const [sent, viewed, platformPaid] = await Promise.all([
-    db.invoice.findMany({ where: { businessId: referred.id, kind: "INVOICE", sentAt: { not: null }, importSource: null }, select: { customerId: true } }),
+  // "Sent" means actually emailed or shared (a SENT event), not just marked paid, which also stamps sentAt.
+  const [sent, viewed, onlinePaid] = await Promise.all([
+    db.invoice.findMany({ where: { businessId: referred.id, kind: "INVOICE", importSource: null, events: { some: { type: "SENT" } } }, select: { customerId: true } }),
     db.invoice.count({ where: { businessId: referred.id, kind: "INVOICE", viewedAt: { not: null }, importSource: null } }),
-    db.payment.count({ where: { businessId: referred.id, viaPlatform: true } }),
+    // Paid online (BizBooks Payments or the business's own gateway): real money from a real client.
+    db.payment.count({ where: { businessId: referred.id, reference: { not: null } } }),
   ]);
   const clients = new Set(sent.map((i) => i.customerId)).size;
-  const active = (sent.length >= REFERRAL.minInvoices && clients >= REFERRAL.minClients && viewed >= 1) || platformPaid >= 1;
+  const active = (sent.length >= REFERRAL.minInvoices && clients >= REFERRAL.minClients && viewed >= 1) || onlinePaid >= 1;
   if (!active) return "PENDING";
 
   if (reason) {
     await db.referral.update({ where: { id: ref.id }, data: { status: "REJECTED", reason } });
     return "REJECTED";
+  }
+  // Invoices and views alone can be staged by one person with several accounts. Past the first few, a
+  // referral without an online payment waits for a person to look at it (approve or reject in /admin).
+  if (onlinePaid === 0) {
+    const auto = await db.referral.count({ where: { referrerId: referrer.id, status: "QUALIFIED", reason: null } });
+    if (auto >= REFERRAL.autoQualifyWithoutPayment) {
+      await db.referral.update({ where: { id: ref.id }, data: { status: "REVIEW", reason: "Active, but no online payment yet: check it's a real, separate business" } });
+      return "REVIEW";
+    }
   }
   await qualify(ref.id);
   return "QUALIFIED";

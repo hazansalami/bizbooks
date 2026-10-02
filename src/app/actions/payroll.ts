@@ -77,12 +77,14 @@ async function fillRun(runId: string, business: CurrentBusiness) {
   const businessId = business.id;
   const everyone = await db.employee.findMany({ where: { businessId, status: "ACTIVE" }, orderBy: { createdAt: "asc" } });
   const employees = (isPro(business) ? everyone : everyone.slice(0, FREE_PAYROLL_LIMIT)).sort((a, b) => a.fullName.localeCompare(b.fullName));
+  // Keep each person's payslip link when a draft run is refreshed: links may already be shared with staff.
+  const tokens = new Map((await db.payItem.findMany({ where: { payRunId: runId }, select: { employeeId: true, publicToken: true } })).map((i) => [i.employeeId, i.publicToken]));
   const items = employees.map((e) => {
     const p = computePay(e);
     return {
       payRunId: runId, employeeId: e.id, fullName: e.fullName, jobTitle: e.jobTitle, kind: e.kind,
       bankName: e.bankName, accountNumber: e.accountNumber, accountName: e.accountName ?? e.fullName,
-      ...p, publicToken: randomToken(),
+      ...p, publicToken: tokens.get(e.id) ?? randomToken(),
     };
   });
   const sum = (k: keyof (typeof items)[number]) => round2(items.reduce((s, i) => s + (i[k] as number), 0));

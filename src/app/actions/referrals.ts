@@ -22,7 +22,7 @@ export async function adminReferralDecision(form: FormData) {
   if (str(form, "decision") === "approve" && ref.status !== "QUALIFIED") {
     await qualify(ref.id, { byAdmin: true });
     await logAdmin(admin.email, "REFERRAL_APPROVE", ref.referrerId, `Referral of ${ref.referred.name}`);
-  } else if (str(form, "decision") === "reject" && ref.status === "PENDING") {
+  } else if (str(form, "decision") === "reject" && (ref.status === "PENDING" || ref.status === "REVIEW")) {
     const reason = str(form, "note") || "Rejected by BizBooks";
     await db.referral.update({ where: { id: ref.id }, data: { status: "REJECTED", reason } });
     await logAdmin(admin.email, "REFERRAL_REJECT", ref.referrerId, `Referral of ${ref.referred.name}: ${reason}`);

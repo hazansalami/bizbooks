@@ -8,9 +8,9 @@ import { canPayOnline, emailDraft, loadFullInvoice, payUrl, publicInvoiceUrl, wh
 import { balanceDue, money, naira } from "@/lib/money";
 import { INVOICE_STATUS, PAYMENT_METHODS } from "@/lib/constants";
 import { daysBetween, formatDate, timeAgo, whatsappLink } from "@/lib/utils";
-import { convertQuote, deleteDraft, deleteInvoice, deletePayment, duplicateInvoice, resolveClaim, voidInvoice } from "@/app/actions/invoices";
+import { convertQuote, deleteInvoice, deletePayment, duplicateInvoice, resolveClaim, voidInvoice } from "@/app/actions/invoices";
 import { Badge, buttonClass, Notice, Panel } from "@/components/ui";
-import { ConfirmButton, DoubleConfirmButton, PrintButton } from "@/components/form-bits";
+import { ConfirmButton, PrintButton } from "@/components/form-bits";
 import { InvoiceDocument } from "@/components/invoice-document";
 import { RecordPayment, SharePanel } from "@/components/invoice-actions";
 
@@ -112,26 +112,20 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
         </form>
         <a href={publicInvoiceUrl(inv.publicToken)} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}><ExternalLink className="size-4" aria-hidden /> See what customer sees</a>
         <PrintButton className={buttonClass("secondary", "sm")} />
-        {inv.status === "DRAFT" && inv.amountPaid === 0 ? (
-          <form action={deleteDraft}><input type="hidden" name="id" value={inv.id} />
-            <ConfirmButton message="Delete this draft? This can't be undone." className={buttonClass("ghost", "sm", "text-danger")}><Trash2 className="size-4" aria-hidden /> Delete draft</ConfirmButton>
-          </form>
-        ) : inv.status !== "VOID" && inv.status !== "PAID" && inv.status !== "CONVERTED" ? (
+        {inv.status !== "DRAFT" && inv.status !== "VOID" && inv.status !== "PAID" && inv.status !== "CONVERTED" && (
           <form action={voidInvoice}><input type="hidden" name="id" value={inv.id} />
             <ConfirmButton message="Cancel this invoice? The customer will no longer be able to pay it." className={buttonClass("ghost", "sm", "text-danger")}><XCircle className="size-4" aria-hidden /> Cancel invoice</ConfirmButton>
           </form>
-        ) : null}
-        {!(inv.status === "DRAFT" && inv.amountPaid === 0) && (
-          <form action={deleteInvoice}><input type="hidden" name="id" value={inv.id} />
-            <DoubleConfirmButton
-              messages={[
-                `Permanently delete ${inv.number}? This can't be undone.`,
-                ...(payments.length ? [`${inv.number} has ${payments.length === 1 ? "a payment" : `${payments.length} payments`} recorded (${money(inv.amountPaid, inv.currency)}). Deleting the invoice removes ${payments.length === 1 ? "it" : "them"} from your books too.${payments.some((p) => p.reference) ? " It was paid online: deleting doesn't refund the client, so refund in Paystack or Flutterwave first if you need to." : ""} Delete anyway?`] : []),
-              ]}
-              className={buttonClass("ghost", "sm", "text-danger")}
-            ><Trash2 className="size-4" aria-hidden /> Delete invoice</DoubleConfirmButton>
-          </form>
         )}
+        <form action={deleteInvoice}><input type="hidden" name="id" value={inv.id} />
+          <ConfirmButton
+            message={[
+              `Permanently delete ${inv.status === "DRAFT" ? "this draft" : inv.number}? This can't be undone.${inv.depositForId ? " It's the deposit for a quote: once deleted, it won't be credited when the quote becomes an invoice." : ""}`,
+              ...(payments.length ? [`${inv.number} has ${payments.length === 1 ? "a payment" : `${payments.length} payments`} recorded (${money(inv.amountPaid, inv.currency)}). Deleting the invoice removes ${payments.length === 1 ? "it" : "them"} from your books too.${payments.some((p) => p.reference) ? " It was paid online: deleting doesn't refund the client, so refund in Paystack or Flutterwave first if you need to." : ""} Delete anyway?`] : []),
+            ]}
+            className={buttonClass("ghost", "sm", "text-danger")}
+          ><Trash2 className="size-4" aria-hidden /> {inv.status === "DRAFT" ? "Delete draft" : `Delete ${inv.kind === "QUOTE" ? "quote" : "invoice"}`}</ConfirmButton>
+        </form>
       </div>
 
       {inv.acceptedAt && (

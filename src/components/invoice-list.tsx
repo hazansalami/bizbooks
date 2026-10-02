@@ -12,7 +12,7 @@ import { cn, dateInput } from "@/lib/utils";
 export type InvoiceRow = {
   id: string; customer: string; sub: string; amount: string;
   badge: { label: string; tone: "brand" | "sun" | "neutral" | "danger" | "info" };
-  hasPayments: boolean; paidOnline: boolean; status: string;
+  hasPayments: boolean; paidOnline: boolean; status: string; foreign: boolean; deposit: boolean;
 };
 
 /** The invoice list with bulk selection: mark paid, cancel or delete many at once. */
@@ -36,6 +36,8 @@ export function InvoiceList({ rows, toolbar, empty }: { rows: InvoiceRow[]; tool
   const online = chosen.filter((r) => r.paidOnline).length;
   const withPayments = chosen.filter((r) => r.hasPayments).length;
   const openCount = chosen.filter((r) => !["PAID", "VOID"].includes(r.status)).length;
+  // Bulk "mark as paid" is naira-only: other currencies need the day's rate, entered on the invoice.
+  const payable = chosen.filter((r) => !["PAID", "VOID"].includes(r.status) && !r.foreign).length;
 
   return (
     <>
@@ -80,7 +82,8 @@ export function InvoiceList({ rows, toolbar, empty }: { rows: InvoiceRow[]; tool
             setOp(op);
             if (op === "delete") {
               const n = selected.size;
-              if (!window.confirm(`Permanently delete ${n} invoice${n === 1 ? "" : "s"}? This can't be undone.`)) { e.preventDefault(); return; }
+              const deposits = chosen.filter((r) => r.deposit).length;
+              if (!window.confirm(`Permanently delete ${n} invoice${n === 1 ? "" : "s"}? This can't be undone.${deposits ? ` ${deposits} ${deposits === 1 ? "is a quote's deposit" : "are quote deposits"}: once deleted, ${deposits === 1 ? "it" : "they"} won't be credited when the quote becomes an invoice.` : ""}`)) { e.preventDefault(); return; }
               // Second, separate confirmation before payments are removed from the books. Cancel stops everything:
               // to delete only the unpaid ones, untick the paid ones first.
               const it = withPayments === 1 ? "it" : "them";
@@ -107,7 +110,7 @@ Cancel: delete nothing. (To keep the paid ones, untick them first.)`,
           <input type="hidden" name="withPayments" defaultValue="" />
           <div className="flex flex-wrap items-center gap-2">
             <p className="mr-auto text-sm font-semibold">{selected.size} selected</p>
-            <button type="button" onClick={() => setPaying((p) => !p)} disabled={!openCount} aria-expanded={paying} className={buttonClass("primary", "sm")}>
+            <button type="button" onClick={() => setPaying((p) => !p)} disabled={!payable} aria-expanded={paying} className={buttonClass("primary", "sm")}>
               <CheckCheck className="size-4" aria-hidden /> Mark as paid
             </button>
             <button type="submit" name="op" value="void" disabled={pending || !openCount} className={buttonClass("secondary", "sm")}>
@@ -133,9 +136,9 @@ Cancel: delete nothing. (To keep the paid ones, untick them first.)`,
                 </select>
               </label>
               <button type="submit" name="op" value="paid" disabled={pending} className={buttonClass("primary", "sm")}>
-                {pending && op === "paid" ? "Saving…" : `Record full payment on ${openCount} invoice${openCount === 1 ? "" : "s"}`}
+                {pending && op === "paid" ? "Saving…" : `Record full payment on ${payable} invoice${payable === 1 ? "" : "s"}`}
               </button>
-              <p className="w-full text-xs text-muted">Each invoice gets a payment for its outstanding balance. Paid and cancelled invoices are skipped.</p>
+              <p className="w-full text-xs text-muted">Each invoice gets a payment for its outstanding balance. Paid and cancelled invoices are skipped{openCount > payable ? `, and ${openCount - payable} in other currencies are left for you to record with the day's rate` : ""}.</p>
             </div>
           )}
           {!paying && (withPayments > 0 || online > 0 || openCount < selected.size) && (
