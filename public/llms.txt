@@ -86,7 +86,12 @@
 - [Get the app](/install): installs from the browser on Android, iPhone and desktop (PWA), no app store
 - [Compare: Zoho Books](/compare/zoho-books) · [Compare: Wave](/compare/wave)
 - [Insights](/insights)
-- [Solutions: Bookkeeping & reports](/solutions/accounting)
-- [Solutions: Payroll](/solutions/payroll)
-- [Solutions: Tax tracking](/solutions/taxes)
-- [Solutions: Invoicing](/solutions/invoicing)
+
+## Solutions (each with a worked example in naira)
+- [Invoicing](/solutions/invoicing): invoices with RC number, TIN, PO number, 7.5% VAT and 2%/5%/10% WHT; example: a ₦1,000,000 fee invoices at ₦1,075,000 and the client sends ₦1,025,000 after 5% WHT
+- [Online payments](/solutions/payments): Pay now on every invoice by card, transfer or USSD; Paystack settles to the company's verified bank account; ₦500 BizBooks fee (none under ₦2,500)
+- [Quotes & deposits](/solutions/quotes): clients accept online and pay a mobilisation deposit; the final invoice credits the deposit and charges VAT only once
+- [Bookkeeping & reports](/solutions/accounting): profit and loss (accrual or cash) and cash flow as shareable statements with every transaction, VAT, aging and payroll reports
+- [Expenses, bills & receipts](/solutions/expenses): receipt photos, unpaid supplier bills, recurring costs, input VAT offset against output VAT
+- [Tax tracking](/solutions/taxes): VAT by the 21st, PAYE by the 10th, pension within 7 working days, WHT by the 21st, with amounts from the company's own records
+- [Payroll](/solutions/payroll): PAYE under the 2026 bands (first ₦800,000 tax-free, rent relief), 8%/10% pension, NHF, contractor WHT, payslips and a bank bulk-transfer file
