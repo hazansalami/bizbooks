@@ -1,15 +1,18 @@
 import Link from "next/link";
-import { ChevronRight, CreditCard, Landmark, Palette, Upload } from "lucide-react";
+import { ChevronRight, CreditCard, Landmark, LogOut, Palette, Upload } from "lucide-react";
 import { INVOICE_TEMPLATES, templateId } from "@/lib/invoice-templates";
 import { requireBusiness } from "@/lib/auth";
 import { isPro } from "@/lib/plan";
-import { PageHeader } from "@/components/ui";
+import { Badge, buttonClass, Notice, PageHeader, Panel } from "@/components/ui";
+import { ConfirmButton } from "@/components/form-bits";
+import { signOutEverywhere } from "@/app/actions/auth";
 import { ProfileForm } from "@/components/settings-forms";
 
 export const metadata = { title: "Settings" };
 
-export default async function Settings() {
-  const { business: b } = await requireBusiness();
+export default async function Settings({ searchParams }: { searchParams: Promise<{ signedOut?: string }> }) {
+  const { user, business: b } = await requireBusiness();
+  const { signedOut } = await searchParams;
   return (
     <>
       <PageHeader title="Settings" />
@@ -39,6 +42,24 @@ export default async function Settings() {
           invoiceFooter: b.invoiceFooter ?? "", autoReminders: b.autoReminders, logo: b.logo ?? "", brandColor: b.brandColor,
         }}
       />
+
+      <Panel className="mt-6 p-5 sm:p-6">
+        <h2 className="text-lg">Your account</h2>
+        {signedOut && <Notice tone="brand" className="mt-3">Done. Every other device has been signed out; this one stays signed in.</Notice>}
+        <dl className="mt-3 grid gap-1 text-sm sm:grid-cols-[10rem_1fr]">
+          <dt className="text-muted">Sign-in email</dt>
+          <dd>{user.email} {user.emailVerifiedAt ? <Badge tone="brand">Confirmed</Badge> : <Link href="/verify-email?next=/app/settings" className="font-semibold text-brand underline">Confirm it</Link>}</dd>
+        </dl>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link href="/forgot-password" className={buttonClass("secondary", "sm")}>Change password</Link>
+          <form action={signOutEverywhere}>
+            <ConfirmButton message="Sign out of BizBooks on every other phone and computer? You'll stay signed in here." className={buttonClass("secondary", "sm")}>
+              <LogOut className="size-4" aria-hidden /> Sign out of all other devices
+            </ConfirmButton>
+          </form>
+        </div>
+        <p className="mt-2 text-sm text-muted">Use this if you signed in on a shared or lost device, or think someone else has access to your account.</p>
+      </Panel>
     </>
   );
 }

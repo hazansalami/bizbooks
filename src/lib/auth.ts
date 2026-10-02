@@ -9,8 +9,10 @@ export const getCurrentUser = cache(async () => {
   const session = await readSession();
   if (!session) return null;
   const user = await db.user.findUnique({ where: { id: session.userId }, include: { business: true } });
-  // A session from before the latest password change is no longer valid (JWT iat has 1-second precision).
-  if (user?.passwordChangedAt && (session.issuedAt ?? 0) < Math.floor(user.passwordChangedAt.getTime() / 1000) * 1000) return null;
+  // A session from before the latest password change or "sign out of all devices" is no longer valid
+  // (JWT iat has 1-second precision, so compare whole seconds).
+  const cutoff = Math.max(user?.passwordChangedAt?.getTime() ?? 0, user?.sessionsRevokedAt?.getTime() ?? 0);
+  if (cutoff && (session.issuedAt ?? 0) < Math.floor(cutoff / 1000) * 1000) return null;
   return user;
 });
 
