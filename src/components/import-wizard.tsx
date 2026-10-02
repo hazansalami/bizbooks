@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, FileSpreadsheet, RefreshCw, Upload, X } from "lucide-react";
 import { combine, parseImportFile, type ParsedFile } from "@/lib/import/parse";
-import { norm, numberPart } from "@/lib/import/values";
+import { norm, numberPart, parseDate, type DateOrder } from "@/lib/import/values";
 import { naira } from "@/lib/money";
 import { FREE_RECURRING_LIMIT, FREQUENCIES } from "@/lib/constants";
 import type { ImportResult } from "@/lib/import/save";
@@ -58,6 +58,14 @@ export function ImportWizard(p: { existingCustomers: string[]; existingNumbers: 
   const [skipRecurring, setSkipRecurring] = useState<Set<string>>(new Set());
   const [recurringActive, setRecurringActive] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  // The raw text of each file, so they can be read again once the owner says how dates are written.
+  const texts = useRef(new Map<string, string>());
+  const [dateOrder, setDateOrder] = useState<DateOrder | undefined>();
+  const guessedFile = files.find((f) => f.dateOrderGuessed && f.sampleDate);
+  function chooseDateOrder(order: DateOrder) {
+    setDateOrder(order);
+    setFiles((fs) => fs.map((f) => parseImportFile(f.fileName, texts.current.get(f.fileName) ?? "", order)));
+  }
 
   const data = useMemo(() => combine(files), [files]);
   const known = useMemo(() => new Set(p.existingNumbers), [p.existingNumbers]);
@@ -82,7 +90,9 @@ export function ImportWizard(p: { existingCustomers: string[]; existingNumbers: 
     for (const f of Array.from(list)) {
       if (!/\.(csv|txt)$/i.test(f.name)) { bad.push(`${f.name}: save it as CSV first (File → Save As → CSV).`); continue; }
       if (f.size > 15_000_000) { bad.push(`${f.name}: this file is over 15 MB. Export a shorter date range, then import the rest separately.`); continue; }
-      parsed.push(parseImportFile(f.name, await f.text()));
+      const text = await f.text();
+      texts.current.set(f.name, text);
+      parsed.push(parseImportFile(f.name, text, dateOrder));
     }
     setFiles((prev) => [...prev.filter((x) => !parsed.some((y) => y.fileName === x.fileName)), ...parsed]);
     setRejected(bad);
@@ -114,7 +124,7 @@ export function ImportWizard(p: { existingCustomers: string[]; existingNumbers: 
     }
   }
 
-  if (result) return <Done r={result} source={data.source} onAgain={() => { setFiles([]); setResult(null); setPaidMode(""); }} />;
+  if (result) return <Done r={result} source={data.source} onAgain={() => { setFiles([]); setResult(null); setPaidMode(""); setDateOrder(undefined); texts.current.clear(); }} />;
 
   return (
     <div className="space-y-6">
@@ -151,6 +161,25 @@ export function ImportWizard(p: { existingCustomers: string[]; existingNumbers: 
           <input ref={input} type="file" accept=".csv,text/csv,.txt" multiple className="sr-only" onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
         </label>
         {rejected.map((r) => <p key={r} role="alert" className="mt-2 text-sm font-medium text-danger">{r}</p>)}
+
+        {guessedFile && (
+          <div className="mt-4 rounded-xl border border-sun/50 bg-sun-wash p-4 text-sm">
+            <p className="font-semibold text-sun-ink">How are dates written in {files.filter((f) => f.dateOrderGuessed).length > 1 ? "these files" : "this file"}?</p>
+            <p className="mt-1 text-ink-soft">Every date could be read either way, so check one: is <strong className="num">{guessedFile.sampleDate}</strong> …</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {(["DMY", "MDY"] as const).map((o) => {
+                const read = parseDate(guessedFile.sampleDate, o);
+                return (
+                  <button key={o} type="button" onClick={() => chooseDateOrder(o)} aria-pressed={dateOrder === o}
+                    className={cn(buttonClass(dateOrder === o ? "primary" : "secondary", "sm"))} disabled={!read}>
+                    {read ? formatDate(read) : "not a real date"} <span className="font-normal opacity-80">({o === "DMY" ? "day first" : "month first"})</span>
+                  </button>
+                );
+              })}
+            </div>
+            {!dateOrder && <p className="mt-2 text-xs text-muted">Until you choose, dates are read day first, the usual Nigerian format.</p>}
+          </div>
+        )}
 
         {files.length > 0 && (
           <ul className="mt-4 space-y-3">

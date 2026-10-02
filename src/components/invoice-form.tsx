@@ -290,7 +290,7 @@ export function InvoiceForm(p: InvoiceFormProps) {
           </button>
           {more && (
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
-              <Field label="Discount (₦)" name="discount" error={e.discount}>
+              <Field label={`Discount (${currency})`} name="discount" error={e.discount}>
                 <Input name="discount" inputMode="decimal" value={discount} onChange={(ev) => setDiscount(ev.target.value)} placeholder="0" className="num" />
               </Field>
               <Field label="Withholding tax" name="whtRate" hint="If this client deducts WHT before paying you, which most companies and government agencies do.">

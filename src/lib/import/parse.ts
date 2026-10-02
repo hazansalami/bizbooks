@@ -1,4 +1,4 @@
-import { column, detectDateOrder, norm, numberPart, parseCSV, parseDate, parseMoney, round2 } from "./values";
+import { column, dateOrderOf, norm, numberPart, parseCSV, parseDate, parseMoney, round2, type DateOrder } from "./values";
 
 /*
   Reads exports from Wave and Zoho Books (and most other invoice CSVs) into one shape the importer understands.
@@ -42,9 +42,30 @@ export type ParsedFile = {
   /** Recurring profiles exported from the old tool (Zoho Books recurring invoices). */
   recurring?: ImpRecurring[];
   from?: string | null; to?: string | null;
+  /** Every date in the file reads both ways (03/04/2026), so day-first was assumed: ask the owner to confirm. */
+  dateOrderGuessed?: boolean;
+  /** A date from the file, to show how it was read when asking. */
+  sampleDate?: string;
 };
 
-export function parseImportFile(fileName: string, text: string): ParsedFile {
+/* The date order for the file being parsed: the owner's choice when they've made one, otherwise detected. */
+let dateCtx: { forced?: DateOrder; guessed: boolean; sample?: string } = { guessed: false };
+function pickOrder(values: string[]): DateOrder {
+  if (!dateCtx.sample) dateCtx.sample = values.find((v) => /^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}/.test(v.trim()));
+  if (dateCtx.forced) return dateCtx.forced;
+  const { order, guessed } = dateOrderOf(values);
+  if (guessed) dateCtx.guessed = true;
+  return order;
+}
+
+/** Parse one exported file. Pass dateOrder once the owner has said how the file writes its dates. */
+export function parseImportFile(fileName: string, text: string, dateOrder?: DateOrder): ParsedFile {
+  dateCtx = { forced: dateOrder, guessed: false };
+  const parsed = parseImportFileWith(fileName, text);
+  return dateCtx.guessed || dateOrder ? { ...parsed, dateOrderGuessed: dateCtx.guessed || !!dateOrder, sampleDate: dateCtx.sample } : parsed;
+}
+
+function parseImportFileWith(fileName: string, text: string): ParsedFile {
   const rows = parseCSV(text).filter((r) => r.some((c) => c !== ""));
   const base = { fileName, customers: [], invoices: [], warnings: [], hasPayments: false, hasDueDates: false, hasLineDetails: false };
   if (!rows.length) return { ...base, source: "CSV", label: "Empty file", warnings: ["This file is empty."] };
@@ -211,7 +232,7 @@ function waveAccounting(fileName: string, headers: string[], data: string[][]): 
     customer: column(headers, "customer"),
     number: column(headers, "invoice number"),
   };
-  const order = detectDateOrder(data.map((r) => r[c.date] ?? ""));
+  const order = pickOrder(data.map((r) => r[c.date] ?? ""));
   const entries: Entry[] = [];
   for (const r of data) {
     const date = parseDate(r[c.date], order);
@@ -265,7 +286,7 @@ function invoiceRows(fileName: string, headers: string[], data: string[][]): Par
     email: col("email", "customer email", "emailid"),
   };
   const isZoho = column(headers, "invoice id") >= 0 || column(headers, "item desc") >= 0 || column(headers, "invoice status") >= 0;
-  const order = detectDateOrder(data.flatMap((r) => [r[c.date] ?? "", r[c.due] ?? ""]));
+  const order = pickOrder(data.flatMap((r) => [r[c.date] ?? "", r[c.due] ?? ""]));
   const get = (r: string[], i: number) => (i >= 0 ? (r[i] ?? "").trim() : "");
   const invoices = new Map<string, ImpInvoice & { itemTax: number; emails: Set<string> }>();
   const warnings: string[] = [];
@@ -323,7 +344,7 @@ function invoiceRows(fileName: string, headers: string[], data: string[][]): Par
     if (!customers.has(inv.customer.toLowerCase())) customers.set(inv.customer.toLowerCase(), { name: inv.customer, email: [...emails][0] ?? null });
     out.push(inv);
   }
-  if (noDate) warnings.push(`${noDate} row${noDate === 1 ? "" : "s"} had no readable invoice date and were skipped.`);
+  if (noDate) warnings.push(`${noDate} row${noDate === 1 ? "" : "s"} had no readable invoice date (or an impossible one, like 31 February) and ${noDate === 1 ? "was" : "were"} skipped.`);
   if (c.customer < 0) warnings.push("We couldn't find a client column. Every invoice needs a client name.");
   const foreign = out.filter((i) => i.currency && !/^(ngn|₦|naira)$/i.test(i.currency)).length;
   if (foreign) warnings.push(`${foreign} invoice${foreign === 1 ? " is" : "s are"} in another currency. Amounts come in as they are, recorded in naira.`);
@@ -502,7 +523,7 @@ function recurringRows(fileName: string, headers: string[], data: string[][]): P
     discount: col("entity discount amount", "discount amount"),
   };
   const get = (r: string[], i: number) => (i >= 0 ? (r[i] ?? "").trim() : "");
-  const order = detectDateOrder(data.flatMap((r) => [get(r, c.start), get(r, c.next), get(r, c.end)]));
+  const order = pickOrder(data.flatMap((r) => [get(r, c.start), get(r, c.next), get(r, c.end)]));
   const profiles = new Map<string, (ImpRecurring & { tax: number }) | null>();
   let inactive = 0;
   let unsupported = 0;
