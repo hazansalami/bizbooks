@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { Download, Printer } from "lucide-react";
 import { notFound } from "next/navigation";
 import { requireBusiness } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { PERIODS, periodRange, previousRange, profitAndLoss, vatSummary, type Period } from "@/lib/reports";
-import { accrualTotals, agingOf, cashDate, paidExpensesWhere, payables, type Aging } from "@/lib/finance";
+import { cashFlowDetail, PERIODS, periodRange, previousRange, profitAndLossDetail, vatSummary, type DetailLine, type Period } from "@/lib/reports";
+import { agingOf, cashDate, paidExpensesWhere, payables, type Aging } from "@/lib/finance";
 import { receivables } from "@/lib/stats";
 import { naira, round2, money } from "@/lib/money";
 import { periodLabel } from "@/lib/payroll";
@@ -52,8 +53,67 @@ function Table({ head, rows, foot, align = [] }: { head: string[]; rows: (string
   );
 }
 
+/** An amount that reduces the total, shown with a minus sign (but never "−₦0"). */
+const minus = (n: number) => (n ? `−${naira(n)}` : naira(0));
+
 const agingHead = ["Coming due", "1–30 days", "31–60 days", "61–90 days", "90+ days", "Total"];
 const agingCells = (a: Aging) => [a.comingDue, a.d1_30, a.d31_60, a.d61_90, a.d90plus, a.total].map((v) => naira(round2(v)));
+
+type StatementBusiness = { name: string; legalName: string | null; rcNumber: string | null; tin: string | null; address: string | null; city: string | null; state: string | null; email: string | null; phone: string | null; logo: string | null };
+
+/** The top of a shareable statement: who it's for, what it covers, and when it was prepared. */
+function StatementHeader({ b, title, range, note }: { b: StatementBusiness; title: string; range: string; note?: string }) {
+  const place = [b.address, b.city, b.state].filter(Boolean).join(", ");
+  const ids = [b.rcNumber && `RC ${b.rcNumber}`, b.tin && `TIN ${b.tin}`].filter(Boolean).join(" · ");
+  return (
+    <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-5">
+      <div className="flex items-start gap-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {b.logo && <img src={b.logo} alt="" className="max-h-12 max-w-32 object-contain" />}
+        <div>
+          <p className="text-lg font-bold">{b.legalName || b.name}</p>
+          {ids && <p className="text-sm text-muted">{ids}</p>}
+          {place && <p className="text-sm text-muted">{place}</p>}
+          {(b.email || b.phone) && <p className="text-sm text-muted">{[b.email, b.phone].filter(Boolean).join(" · ")}</p>}
+        </div>
+      </div>
+      <div className="sm:text-right">
+        <p className="text-xl font-bold">{title}</p>
+        <p className="text-sm text-ink-soft">{range}</p>
+        {note && <p className="text-sm text-muted">{note}</p>}
+        <p className="text-xs text-muted">Prepared {formatDate(new Date())}</p>
+      </div>
+    </header>
+  );
+}
+
+/** A heading with its transactions and a subtotal: one block of a statement. */
+function StatementSection({ title, lines, total, totalLabel, sign = 1, empty = "None in this period." }: { title: string; lines: DetailLine[]; total: number; totalLabel: string; sign?: 1 | -1; empty?: string }) {
+  const fmt = (n: number) => (sign < 0 ? minus(n) : naira(n));
+  return (
+    <section className="mt-6">
+      <h3 className="mb-1 text-sm font-bold uppercase tracking-wider text-ink-soft">{title}</h3>
+      <div className="overflow-x-auto">
+        <table className="num w-full min-w-[30rem] text-sm">
+          <thead className="text-xs text-muted">
+            <tr className="border-b border-line"><th scope="col" className="w-28 py-2 text-left font-semibold">Date</th><th scope="col" className="py-2 text-left font-semibold">Name</th><th scope="col" className="py-2 text-left font-semibold">Details</th><th scope="col" className="py-2 text-right font-semibold">Amount</th></tr>
+          </thead>
+          <tbody>
+            {lines.length === 0 ? <tr><td colSpan={4} className="py-3 text-muted">{empty}</td></tr> : lines.map((l) => (
+              <tr key={l.id} className="border-b border-line/60">
+                <td className="whitespace-nowrap py-2 align-top">{formatDate(l.date)}</td>
+                <td className="py-2 pr-3 align-top">{l.name}</td>
+                <td className="py-2 pr-3 align-top text-ink-soft"><Link href={l.href} className="hover:underline">{l.ref || "—"}</Link></td>
+                <td className="whitespace-nowrap py-2 text-right align-top">{fmt(l.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot><tr><td colSpan={3} className="py-2 font-semibold">{totalLabel}</td><td className="whitespace-nowrap py-2 text-right font-bold">{fmt(total)}</td></tr></tfoot>
+        </table>
+      </div>
+    </section>
+  );
+}
 
 export default async function Report({ params, searchParams }: Props) {
   const { business } = await requireBusiness();
@@ -67,21 +127,22 @@ export default async function Report({ params, searchParams }: Props) {
   const range = `${formatDate(from)} – ${formatDate(new Date(to.getTime() - 1))}`;
 
   let body: React.ReactNode = null;
+  // Reports written as a statement (a document to share) set this, and wrap their body in sheet().
+  let statement: { title: string; note?: string } | null = null;
+  const sheet = (children: React.ReactNode) => (
+    <article className="print-sheet rounded-2xl border border-line bg-paper p-5 sm:p-8">
+      <StatementHeader b={business} title={statement?.title ?? REPORT_TITLES[slug]} range={range} note={statement?.note} />
+      {children}
+    </article>
+  );
 
   if (slug === "profit-and-loss") {
     const basis = sp.basis === "cash" ? "cash" : "accrual";
     const prev = previousRange(period);
-    let cur: { income: number; expenses: number; net: number; categories: { name: string; amount: number }[] };
-    let before: typeof cur;
-    if (basis === "accrual") {
-      [cur, before] = await Promise.all([accrualTotals(id, from, to), accrualTotals(id, prev.from, prev.to)]);
-    } else {
-      const [c, b] = await Promise.all([profitAndLoss(id, from, to), profitAndLoss(id, prev.from, prev.to)]);
-      const shape = (p: typeof c) => ({ income: p.income, expenses: round2(p.moneyOut - p.inputVat), net: p.profit, categories: p.categories });
-      cur = shape(c);
-      before = shape(b);
-    }
+    const [cur, before] = await Promise.all([profitAndLossDetail(id, from, to, basis), profitAndLossDetail(id, prev.from, prev.to, basis)]);
+    const prevLabel = prev.label.replace(/^the /, "").replace(/^./, (c) => c.toUpperCase());
     const prevCat = new Map(before.categories.map((c) => [c.name, c.amount]));
+    statement = { title: "Profit and loss statement", note: basis === "accrual" ? "Accrual basis · amounts exclude VAT" : "Cash basis · amounts exclude VAT" };
     body = (
       <>
         <nav aria-label="Basis" className="no-print mb-4 flex gap-1 rounded-full bg-paper p-1 text-sm font-semibold ring-1 ring-line sm:w-fit">
@@ -89,41 +150,73 @@ export default async function Report({ params, searchParams }: Props) {
             <Link key={b} href={`/app/reports/profit-and-loss?period=${period}&basis=${b}`} aria-current={basis === b ? "true" : undefined} className={cn("inline-flex min-h-9 flex-1 items-center justify-center whitespace-nowrap rounded-full px-4", basis === b ? "bg-ink text-white" : "text-muted")}>{l}</Link>
           ))}
         </nav>
-        <Table
-          head={["", "This period", prev.label.replace(/^the /, "")]}
-          rows={[
-            [<strong key="i">Income</strong>, naira(cur.income), naira(before.income)],
-            ...cur.categories.map((c) => [<span key={c.name} className="pl-4 text-ink-soft">{c.name}</span>, `−${naira(c.amount)}`, prevCat.has(c.name) ? `−${naira(prevCat.get(c.name)!)}` : "—"]),
-            [<strong key="e">Total expenses</strong>, `−${naira(cur.expenses)}`, `−${naira(before.expenses)}`],
-          ]}
-          foot={[cur.net >= 0 ? "Net profit" : "Net loss", naira(cur.net), naira(before.net)]}
-        />
-        <p className="mt-3 text-sm text-muted">
-          {basis === "accrual" ? "Accrual: income when you invoice, expenses and bills when they're dated, whether paid or not." : "Cash: income when clients pay, expenses when money leaves your account."} Amounts exclude VAT.
-        </p>
+        {sheet(<>
+          <section className="mt-5">
+            <h3 className="mb-1 text-sm font-bold uppercase tracking-wider text-ink-soft">Summary</h3>
+            <table className="num w-full text-sm">
+              <thead className="text-xs text-muted"><tr className="border-b border-line"><th scope="col" className="py-2 text-left font-semibold"><span className="sr-only">Line</span></th><th scope="col" className="py-2 text-right font-semibold">This period</th><th scope="col" className="py-2 text-right font-semibold">{prevLabel}</th></tr></thead>
+              <tbody>
+                <tr className="border-b border-line/60"><td className="py-2">Income</td><td className="py-2 text-right">{naira(cur.income.amount)}</td><td className="py-2 text-right text-ink-soft">{naira(before.income.amount)}</td></tr>
+                {cur.categories.map((c) => (
+                  <tr key={c.name} className="border-b border-line/60"><td className="py-2 pl-4 text-ink-soft">{c.name}</td><td className="py-2 text-right">{minus(c.amount)}</td><td className="py-2 text-right text-ink-soft">{prevCat.has(c.name) ? minus(prevCat.get(c.name)!) : "—"}</td></tr>
+                ))}
+                <tr className="border-b border-line/60"><td className="py-2">Total expenses</td><td className="py-2 text-right">{minus(cur.expenses)}</td><td className="py-2 text-right text-ink-soft">{minus(before.expenses)}</td></tr>
+              </tbody>
+              <tfoot><tr className="text-base"><td className="py-3 font-bold">{cur.net >= 0 ? "Net profit" : "Net loss"}</td><td className={cn("py-3 text-right font-bold", cur.net < 0 && "text-danger")}>{naira(cur.net)}</td><td className="py-3 text-right font-semibold text-ink-soft">{naira(before.net)}</td></tr></tfoot>
+            </table>
+          </section>
+
+          <StatementSection title={basis === "accrual" ? "Income: invoices issued" : "Income: payments received"} lines={cur.income.lines} total={cur.income.amount} totalLabel="Total income" />
+          {cur.categories.map((c) => <StatementSection key={c.name} title={`Expenses: ${c.name}`} lines={c.lines} total={c.amount} totalLabel={`Total ${c.name.toLowerCase()}`} sign={-1} />)}
+          {cur.categories.length === 0 && <StatementSection title="Expenses" lines={[]} total={0} totalLabel="Total expenses" sign={-1} />}
+
+          <table className="num mt-6 w-full border-t-2 border-ink text-base">
+            <tbody>
+              <tr><td className="py-2">Total income</td><td className="py-2 text-right">{naira(cur.income.amount)}</td></tr>
+              <tr><td className="py-2">Total expenses</td><td className="py-2 text-right">{minus(cur.expenses)}</td></tr>
+              <tr className="border-t border-line"><td className="py-3 font-bold">{cur.net >= 0 ? "Net profit" : "Net loss"}</td><td className={cn("py-3 text-right text-lg font-bold", cur.net < 0 && "text-danger")}>{naira(cur.net)}</td></tr>
+            </tbody>
+          </table>
+          <p className="mt-4 text-xs text-muted">
+            {basis === "accrual" ? "Accrual basis: income when invoiced, expenses and bills on their own dates, paid or not." : "Cash basis: income when clients paid, expenses when money left the account."} All amounts are in naira and before VAT; foreign-currency amounts are converted at the rate recorded on the invoice or payment.
+          </p>
+        </>)}
       </>
     );
   }
 
   if (slug === "cash-flow") {
-    const [payments, expenses] = await Promise.all([
-      db.payment.findMany({ where: { businessId: id, paidAt: { gte: from, lt: to } } }),
-      db.expense.findMany({ where: paidExpensesWhere(id, from, to) }),
-    ]);
-    const byMonth = new Map<string, { inflow: number; outflow: number; payroll: number }>();
-    const key = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const row = (k: string) => byMonth.get(k) ?? byMonth.set(k, { inflow: 0, outflow: 0, payroll: 0 }).get(k)!;
-    for (const p of payments) row(key(p.paidAt)).inflow += p.amount * p.exchangeRate;
-    for (const e of expenses) { const r = row(key(cashDate(e))); if (e.payRunId) r.payroll += e.amount; else r.outflow += e.amount; }
-    const months = [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b));
-    const t = months.reduce((s, [, v]) => ({ inflow: s.inflow + v.inflow, outflow: s.outflow + v.outflow, payroll: s.payroll + v.payroll }), { inflow: 0, outflow: 0, payroll: 0 });
-    body = (
-      <Table
-        head={["Month", "Received from clients", "Expenses & bills paid", "Payroll", "Net change"]}
-        rows={months.map(([k, v]) => [periodLabel(k), naira(v.inflow), `−${naira(v.outflow)}`, `−${naira(v.payroll)}`, <span key="n" className={v.inflow - v.outflow - v.payroll < 0 ? "text-danger" : ""}>{naira(round2(v.inflow - v.outflow - v.payroll))}</span>])}
-        foot={["Total", naira(t.inflow), `−${naira(t.outflow)}`, `−${naira(t.payroll)}`, naira(round2(t.inflow - t.outflow - t.payroll))]}
-      />
-    );
+    const months = await cashFlowDetail(id, from, to);
+    const t = months.reduce((acc, m) => ({ inflow: acc.inflow + m.totals.inflow, outflow: acc.outflow + m.totals.outflow, payroll: acc.payroll + m.totals.payroll }), { inflow: 0, outflow: 0, payroll: 0 });
+    const netOf = (v: { inflow: number; outflow: number; payroll: number }) => round2(v.inflow - v.outflow - v.payroll);
+    statement = { title: "Cash flow statement", note: "Money received and paid out, in naira" };
+    body = sheet(<>
+      <section className="mt-5">
+        <h3 className="mb-1 text-sm font-bold uppercase tracking-wider text-ink-soft">Summary</h3>
+        <div className="overflow-x-auto">
+          <table className="num w-full min-w-[30rem] text-sm">
+            <thead className="text-xs text-muted"><tr className="border-b border-line">{["Month", "Received", "Expenses & bills", "Payroll", "Net change"].map((h, i) => <th key={h} scope="col" className={cn("py-2 font-semibold", i ? "text-right" : "text-left")}>{h}</th>)}</tr></thead>
+            <tbody>
+              {months.length === 0 ? <tr><td colSpan={5} className="py-3 text-muted">No money in or out in this period.</td></tr> : months.map((m) => (
+                <tr key={m.key} className="border-b border-line/60"><td className="py-2">{periodLabel(m.key)}</td><td className="py-2 text-right">{naira(m.totals.inflow)}</td><td className="py-2 text-right">{minus(m.totals.outflow)}</td><td className="py-2 text-right">{minus(m.totals.payroll)}</td><td className={cn("py-2 text-right", netOf(m.totals) < 0 && "text-danger")}>{naira(netOf(m.totals))}</td></tr>
+              ))}
+            </tbody>
+            <tfoot><tr className="text-base"><td className="py-3 font-bold">Total</td><td className="py-3 text-right font-semibold">{naira(round2(t.inflow))}</td><td className="py-3 text-right font-semibold">{minus(round2(t.outflow))}</td><td className="py-3 text-right font-semibold">{minus(round2(t.payroll))}</td><td className={cn("py-3 text-right font-bold", netOf(t) < 0 && "text-danger")}>{naira(netOf(t))}</td></tr></tfoot>
+          </table>
+        </div>
+      </section>
+
+      {months.map((m) => (
+        <div key={m.key} className="mt-8 border-t border-line pt-3">
+          <h2 className="text-lg font-bold">{periodLabel(m.key)}</h2>
+          <StatementSection title="Money in: received from clients" lines={m.inflow} total={m.totals.inflow} totalLabel="Total received" />
+          <StatementSection title="Money out: expenses and bills paid" lines={m.outflow} total={m.totals.outflow} totalLabel="Total expenses and bills" sign={-1} />
+          {m.payroll.length > 0 && <StatementSection title="Money out: payroll" lines={m.payroll} total={m.totals.payroll} totalLabel="Total payroll" sign={-1} />}
+          <p className="num mt-3 flex justify-between border-t border-line pt-2 font-bold"><span>Net change for {periodLabel(m.key)}</span><span className={netOf(m.totals) < 0 ? "text-danger" : ""}>{naira(netOf(m.totals))}</span></p>
+        </div>
+      ))}
+      <p className="mt-6 text-xs text-muted">Amounts are as they moved through the bank, VAT included. Foreign-currency payments are converted to naira at the rate recorded on the day they were received.</p>
+    </>);
   }
 
   if (slug === "vat") {
@@ -261,10 +354,18 @@ export default async function Report({ params, searchParams }: Props) {
 
   return (
     <>
+      {/* A statement prints as the document alone: its own header carries the title and period. */}
+      <div className={statement ? "no-print" : undefined}>
       <PageHeader title={REPORT_TITLES[slug]} back={{ href: "/app/reports", label: "Reports" }}
         description={<>{business.legalName || business.name} · {NO_PERIOD.includes(slug) ? `as of ${formatDate(new Date())}` : range}</>}
-        actions={<PrintButton className="no-print inline-flex min-h-11 items-center rounded-full border border-line-strong bg-paper px-5 text-[0.95rem] font-semibold hover:border-ink">Print / PDF</PrintButton>} />
+        actions={<>
+          {(slug === "profit-and-loss" || slug === "cash-flow" || slug === "transactions") && (
+            <a href={`/app/reports/export?period=${period}`} download className="no-print inline-flex min-h-11 items-center gap-2 rounded-full border border-line-strong bg-paper px-5 text-[0.95rem] font-semibold hover:border-ink"><Download className="size-4" aria-hidden /> CSV</a>
+          )}
+          <PrintButton className="no-print inline-flex min-h-11 items-center gap-2 rounded-full border border-line-strong bg-paper px-5 text-[0.95rem] font-semibold hover:border-ink"><Printer className="size-4" aria-hidden /> {statement ? "Print or save PDF" : "Print / PDF"}</PrintButton>
+        </>} />
       {!NO_PERIOD.includes(slug) && <div className="mb-5"><PeriodNav slug={slug} period={period} basis={sp.basis} /></div>}
+      </div>
       {body}
     </>
   );
