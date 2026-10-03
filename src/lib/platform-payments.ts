@@ -1,5 +1,6 @@
 import "server-only";
 import { round2 } from "./money";
+import { PLATFORM_FEE, paystackFee } from "./fees";
 
 /*
   BizBooks Payments: businesses add a bank account (verified with Paystack's account-name lookup) instead of
@@ -12,12 +13,7 @@ import { round2 } from "./money";
   responses and a simulated checkout page, so the whole flow can be tried locally.
 */
 
-/** Flat fee per successful payment, VAT inclusive. Payments below the threshold carry no fee. */
-export const PLATFORM_FEE = { amount: 500, vatRate: 7.5, freeBelow: 2500 } as const;
-/** Paystack's own local fee (borne by the business, like on their own account): 1.5% + ₦100 above ₦2,500, capped at ₦2,000. */
-export function paystackFee(amount: number) {
-  return round2(Math.min(2000, amount * 0.015 + (amount >= 2500 ? 100 : 0)));
-}
+export { PLATFORM_FEE, paystackFee };
 export const vatInFee = (fee: number) => round2((fee * PLATFORM_FEE.vatRate) / (100 + PLATFORM_FEE.vatRate));
 
 const key = () => process.env.PLATFORM_PAYSTACK_SECRET_KEY || "";
