@@ -5,11 +5,11 @@ import { EmployeeForm } from "@/components/employee-form";
 export const metadata = { title: "Add team member" };
 
 export default async function NewEmployee() {
-  await requireBusiness();
+  const { business } = await requireBusiness();
   return (
     <>
       <PageHeader title="Add a team member" back={{ href: "/app/payroll/team", label: "Team" }} />
-      <EmployeeForm />
+      <EmployeeForm payeDefault={business.payeDefault} />
     </>
   );
 }

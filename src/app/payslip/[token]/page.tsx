@@ -58,7 +58,10 @@ export default async function Payslip({ params }: { params: Promise<{ token: str
         {!contractor && item.pensionEmployer > 0 && (
           <p className="mt-6 rounded-xl bg-canvas p-3 text-sm text-ink-soft">Your employer also paid <strong className="num text-ink">{naira(item.pensionEmployer)}</strong> into your pension this month, on top of your pay.</p>
         )}
-        {item.rentRelief > 0 && <p className="mt-2 text-sm text-muted">Rent relief applied: {naira(item.rentRelief)} a month tax-free.</p>}
+        {item.payeByEmployee && (
+          <p className="mt-2 rounded-xl border border-line p-3 text-sm text-ink-soft">No PAYE was deducted from this pay: you've agreed to settle your own income tax with your state tax office.</p>
+        )}
+        {item.rentRelief > 0 && !item.payeByEmployee && <p className="mt-2 text-sm text-muted">Rent relief applied: {naira(item.rentRelief)} a month tax-free.</p>}
       </article>
       <div className="no-print mt-4 flex justify-center"><PrintButton /></div>
     </main>

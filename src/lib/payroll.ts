@@ -10,7 +10,8 @@ import { round2 } from "./money";
   - Rent relief is 20% of the rent the employee declares, capped at ₦500,000 a year.
 */
 
-export type PayInput = { kind: string; monthlyGross: number; pension: boolean; nhf: boolean; annualRent: number; whtRate: number };
+/** paye: false when the employee settles their own income tax, so none is deducted (defaults to deducting it). */
+export type PayInput = { kind: string; monthlyGross: number; pension: boolean; nhf: boolean; annualRent: number; whtRate: number; paye?: boolean };
 export type PayResult = {
   gross: number; pensionEmployee: number; pensionEmployer: number; nhf: number; rentRelief: number; paye: number; wht: number; net: number;
 };
@@ -39,7 +40,7 @@ export function computePay(e: PayInput): PayResult {
   const nhf = e.nhf ? round2((gross * TAX.nhf) / 100) : 0;
   const rentReliefYear = Math.min((Math.max(0, e.annualRent) * TAX.rentReliefRate) / 100, TAX.rentReliefCap);
   const taxableYear = Math.max(0, gross * 12 - (pensionEmployee + nhf) * 12 - rentReliefYear);
-  const paye = round2(annualIncomeTax(taxableYear) / 12);
+  const paye = e.paye === false ? 0 : round2(annualIncomeTax(taxableYear) / 12);
   return {
     gross, pensionEmployee, pensionEmployer, nhf, rentRelief: round2(rentReliefYear / 12), paye, wht: 0,
     net: round2(gross - pensionEmployee - nhf - paye),
