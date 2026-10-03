@@ -7,6 +7,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
 import { createSession, deleteSession } from "@/lib/session";
+import { getCurrentUser } from "@/lib/auth";
 import { fieldErrors, randomToken } from "@/lib/utils";
 import { escapeHtml, layout, sendEmail } from "@/lib/email";
 import { siteUrl } from "@/lib/site-url";
@@ -77,6 +78,15 @@ export async function login(_: FormState, form: FormData): Promise<FormState> {
   await db.user.update({ where: { id: user.id }, data: { lastSeenAt: new Date() } });
   await createSession({ userId: user.id });
   redirect(next.startsWith("/app") || next.startsWith("/admin") ? next : "/app");
+}
+
+/** Ends every session on every device, then signs this device back in so the owner isn't thrown out too. */
+export async function signOutEverywhere() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  await db.user.update({ where: { id: user.id }, data: { sessionsRevokedAt: new Date() } });
+  await createSession({ userId: user.id });
+  redirect("/app/settings?signedOut=1");
 }
 
 export async function logout() {

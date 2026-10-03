@@ -29,6 +29,8 @@ model User {
   // Set once the user has proved they receive mail at this address (a verification or reset link).
   // The admin dashboard requires it, so signing up with an admin's address isn't enough.
   emailVerifiedAt DateTime?
+  // "Sign out of all devices": sessions issued before this are rejected (like a password change).
+  sessionsRevokedAt DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
