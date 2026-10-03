@@ -37,21 +37,29 @@ export function parseMoney(v: string | undefined | null): number {
 }
 
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+// Real calendar dates only: 31/02 is a typo to flag, not 3 March.
+const daysIn = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 const iso = (y: number, m: number, d: number) =>
-  m >= 1 && m <= 12 && d >= 1 && d <= 31 && y > 1900 ? `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}` : null;
+  m >= 1 && m <= 12 && d >= 1 && y > 1900 && d <= daysIn(y, m) ? `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}` : null;
 const year = (y: string) => (y.length === 2 ? 2000 + Number(y) : Number(y));
 
 export type DateOrder = "DMY" | "MDY";
 
-/** Works out whether slash dates are day-first (Nigerian default) or month-first from the values themselves. */
-export function detectDateOrder(values: string[]): DateOrder {
+/**
+ * Works out whether slash dates are day-first (Nigerian default) or month-first from the values themselves,
+ * and says whether it had to guess: when there are slash dates and every one
+ * reads both ways (03/04/2026), the file alone can't tell, and the owner should confirm.
+ */
+export function dateOrderOf(values: string[]): { order: DateOrder; guessed: boolean } {
+  let slashDates = false;
   for (const v of values) {
     const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})/.exec(v.trim());
     if (!m) continue;
-    if (Number(m[1]) > 12) return "DMY";
-    if (Number(m[2]) > 12) return "MDY";
+    slashDates = true;
+    if (Number(m[1]) > 12) return { order: "DMY", guessed: false };
+    if (Number(m[2]) > 12) return { order: "MDY", guessed: false };
   }
-  return "DMY";
+  return { order: "DMY", guessed: slashDates };
 }
 
 /** Returns YYYY-MM-DD or null. Handles ISO, 24/09/2026, 09/24/2026, 24-Sep-2026, Sep 24, 2026, 24 September 2026. */
