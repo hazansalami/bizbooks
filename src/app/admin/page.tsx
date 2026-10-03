@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { inSequence, loadBusinessRows } from "@/lib/admin";
+import { inSequence, loadBusinessRows, requireAdmin } from "@/lib/admin";
 import { setAdvisorStatus } from "@/app/actions/admin";
 import { adminReviewPaymentAccount } from "@/app/actions/payments";
 import { adminReferralDecision } from "@/app/actions/referrals";
@@ -17,6 +17,8 @@ export const dynamic = "force-dynamic";
 const ONLINE = ["PAYSTACK", "FLUTTERWAVE"];
 
 export default async function AdminOverview() {
+  // Checked here as well as in the layout: a client-side navigation can fetch this page without the layout re-running.
+  await requireAdmin();
   const now = new Date();
   const d7 = addDays(now, -7);
   const d30 = addDays(now, -30);

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { inSequence, planLabel, risksFor } from "@/lib/admin";
+import { inSequence, planLabel, requireAdmin, risksFor } from "@/lib/admin";
 import { addNote, clearCancel, endPause, grantPro, revokePro } from "@/app/actions/admin";
 import { adminReviewPaymentAccount } from "@/app/actions/payments";
 import { Badge } from "@/components/ui";
@@ -17,6 +17,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 }
 
 export default async function AdminBusiness({ params }: { params: Promise<{ id: string }> }) {
+  // Checked here as well as in the layout: a client-side navigation can fetch this page without the layout re-running.
+  await requireAdmin();
   const { id } = await params;
   const b = await db.business.findUnique({
     where: { id },

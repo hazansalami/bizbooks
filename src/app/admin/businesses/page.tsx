@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { loadBusinessRows } from "@/lib/admin";
+import { loadBusinessRows, requireAdmin } from "@/lib/admin";
 import { Badge } from "@/components/ui";
 import { nairaShort } from "@/lib/money";
 import { cn, formatDate, timeAgo } from "@/lib/utils";
@@ -10,6 +10,8 @@ export const dynamic = "force-dynamic";
 const FILTERS = [["", "All"], ["pro", "Pro"], ["free", "Free"], ["risk", "At risk"], ["setup", "Not set up"]] as const;
 
 export default async function AdminBusinesses({ searchParams }: { searchParams: Promise<{ q?: string; plan?: string; risk?: string; setup?: string }> }) {
+  // Checked here as well as in the layout: a client-side navigation can fetch this page without the layout re-running.
+  await requireAdmin();
   const sp = await searchParams;
   const q = (sp.q ?? "").trim().toLowerCase();
   const active = sp.risk ? "risk" : sp.setup ? "setup" : sp.plan ?? "";
