@@ -78,6 +78,8 @@ model Business {
   professionalServices Boolean @default(false)
   // Day of the month salaries are usually paid.
   payDay           Int     @default(25)
+  // Payroll default for new staff: the company deducts PAYE (true) or employees handle their own tax (false).
+  payeDefault Boolean @default(true)
   vatRate          Float   @default(7.5)
   invoicePrefix    String  @default("INV")
   nextInvoiceNo    Int     @default(1)
@@ -452,6 +454,8 @@ model Employee {
   // Annual rent the employee has declared, for the NTA 2025 rent relief.
   annualRent    Float     @default(0)
   pension       Boolean   @default(true)
+  // Staff: whether the company deducts and remits PAYE. When off, the employee settles their own income tax.
+  paye          Boolean   @default(true)
   pensionPin    String?
   pfa           String?
   nhf           Boolean   @default(false)
@@ -515,6 +519,8 @@ model PayItem {
   rentRelief      Float
   paye            Float
   wht             Float    @default(0)
+  // PAYE wasn't deducted because the employee handles their own tax (Employee.paye was off for this run).
+  payeByEmployee  Boolean  @default(false)
   kind            String   @default("EMPLOYEE")
   net             Float
   // Link for the employee's own payslip page.

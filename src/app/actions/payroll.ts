@@ -44,7 +44,8 @@ export async function saveEmployee(_: FormState, form: FormData): Promise<FormSt
   const data = {
     kind, fullName, email: email || null, phone: str(form, "phone") || null, jobTitle: str(form, "jobTitle") || null,
     monthlyGross: round2(monthlyGross), annualRent: round2(annualRent),
-    pension: kind === "EMPLOYEE" && str(form, "pension") === "on", pfa: str(form, "pfa") || null, pensionPin: str(form, "pensionPin") || null,
+    pension: kind === "EMPLOYEE" && str(form, "pension") === "on",
+    paye: kind === "EMPLOYEE" && str(form, "paye") === "on", pfa: str(form, "pfa") || null, pensionPin: str(form, "pensionPin") || null,
     nhf: kind === "EMPLOYEE" && str(form, "nhf") === "on",
     whtRate: [0, 2, 5, 10].includes(Number(str(form, "whtRate"))) ? Number(str(form, "whtRate")) : 5,
     bankName: str(form, "bankName") || null, accountNumber: accountNumber || null, accountName: str(form, "accountName") || null,
@@ -59,6 +60,21 @@ export async function saveEmployee(_: FormState, form: FormData): Promise<FormSt
   }
   revalidatePath("/app/payroll");
   redirect("/app/payroll/team");
+}
+
+/**
+ * Who handles PAYE for staff: the company (deduct and remit) or each employee. Sets the default for new staff,
+ * and with "apply to everyone" updates current staff too. Each person can still be changed on their own page.
+ */
+export async function setPayeDefault(form: FormData) {
+  const { business } = await requireBusiness();
+  const companyDeducts = str(form, "paye") === "company";
+  await db.business.update({ where: { id: business.id }, data: { payeDefault: companyDeducts } });
+  if (str(form, "applyAll") === "on") {
+    await db.employee.updateMany({ where: { businessId: business.id, kind: "EMPLOYEE", status: "ACTIVE" }, data: { paye: companyDeducts } });
+  }
+  revalidatePath("/app/payroll/team");
+  revalidatePath("/app/payroll");
 }
 
 export async function setEmployeeStatus(form: FormData) {
@@ -84,7 +100,7 @@ async function fillRun(runId: string, business: CurrentBusiness) {
     return {
       payRunId: runId, employeeId: e.id, fullName: e.fullName, jobTitle: e.jobTitle, kind: e.kind,
       bankName: e.bankName, accountNumber: e.accountNumber, accountName: e.accountName ?? e.fullName,
-      ...p, publicToken: tokens.get(e.id) ?? randomToken(),
+      ...p, publicToken: tokens.get(e.id) ?? randomToken(), payeByEmployee: e.kind === "EMPLOYEE" && !e.paye,
     };
   });
   const sum = (k: keyof (typeof items)[number]) => round2(items.reduce((s, i) => s + (i[k] as number), 0));
