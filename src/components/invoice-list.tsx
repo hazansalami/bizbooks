@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Ban, CheckCheck, Trash2, X } from "lucide-react";
+import { Ban, CheckCheck, CheckSquare, Trash2, X } from "lucide-react";
 import { bulkInvoiceAction } from "@/app/actions/invoices";
 import { useFormAction, type FormState } from "./form-bits";
 import { Badge, buttonClass, inputClass, Notice } from "./ui";
@@ -18,6 +18,9 @@ export type InvoiceRow = {
 /** The invoice list with bulk selection: mark paid, cancel or delete many at once. */
 export function InvoiceList({ rows, toolbar, empty }: { rows: InvoiceRow[]; toolbar?: React.ReactNode; empty: React.ReactNode }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Checkboxes only appear in select mode, so the everyday list stays a plain list of invoices.
+  const [selecting, setSelecting] = useState(false);
+  const stopSelecting = () => { setSelecting(false); setSelected(new Set()); setPaying(false); };
   const [paying, setPaying] = useState(false);
   const { state, onSubmit, pending } = useFormAction<FormState>(bulkInvoiceAction, {});
   const [op, setOp] = useState("");
@@ -25,7 +28,7 @@ export function InvoiceList({ rows, toolbar, empty }: { rows: InvoiceRow[]; tool
   // After a successful bulk action the list re-renders from the server; drop the selection.
   useEffect(() => {
     if (!state.ok) return;
-    const t = setTimeout(() => { setSelected(new Set()); setPaying(false); }, 0);
+    const t = setTimeout(() => { setSelected(new Set()); setPaying(false); setSelecting(false); }, 0);
     return () => clearTimeout(t);
   }, [state]);
 
@@ -44,11 +47,20 @@ export function InvoiceList({ rows, toolbar, empty }: { rows: InvoiceRow[]; tool
       {toolbar}
       {state.message && <Notice tone={state.ok ? "brand" : "danger"} className="mb-3">{state.message}</Notice>}
       {rows.length === 0 ? empty : (<>
-      <div className="mb-2 flex items-center gap-3 px-1 text-sm">
-        <label className="flex min-h-10 cursor-pointer items-center gap-2 font-semibold text-ink-soft">
-          <input type="checkbox" checked={all} onChange={() => setSelected(all ? new Set() : new Set(ids))} className="size-5 accent-brand" aria-label="Select all invoices shown" />
-          Select all {rows.length > 1 ? `${rows.length} shown` : ""}
-        </label>
+      <div className="mb-2 flex min-h-10 items-center gap-3 px-1 text-sm">
+        {selecting ? (
+          <>
+            <label className="flex min-h-10 cursor-pointer items-center gap-2 font-semibold text-ink-soft">
+              <input type="checkbox" checked={all} onChange={() => setSelected(all ? new Set() : new Set(ids))} className="size-5 accent-brand" aria-label="Select all invoices shown" />
+              Select all {rows.length > 1 ? `${rows.length} shown` : ""}
+            </label>
+            <button type="button" onClick={stopSelecting} className="ml-auto min-h-10 rounded-full px-3 font-semibold text-brand hover:bg-brand-wash">Done</button>
+          </>
+        ) : (
+          <button type="button" onClick={() => setSelecting(true)} className="ml-auto inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 font-semibold text-ink-soft hover:bg-paper hover:text-ink">
+            <CheckSquare className="size-4" aria-hidden /> Select
+          </button>
+        )}
       </div>
 
       <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-paper">
@@ -56,10 +68,12 @@ export function InvoiceList({ rows, toolbar, empty }: { rows: InvoiceRow[]; tool
           const on = selected.has(r.id);
           return (
             <li key={r.id} className={cn("flex items-center", on && "bg-brand-wash/50")}>
-              <label className="flex min-h-14 cursor-pointer items-center self-stretch pl-4 pr-1 sm:pl-5">
-                <input type="checkbox" checked={on} onChange={() => toggle(r.id)} className="size-5 accent-brand" aria-label={`Select ${r.customer} ${r.sub.split(" · ")[0]}`} />
-              </label>
-              <Link href={`/app/invoices/${r.id}`} className="flex min-w-0 flex-1 items-center gap-3 py-3.5 pl-2 pr-4 hover:bg-canvas sm:pr-5">
+              {selecting && (
+                <label className="flex min-h-14 cursor-pointer items-center self-stretch pl-4 pr-1 sm:pl-5">
+                  <input type="checkbox" checked={on} onChange={() => toggle(r.id)} className="size-5 accent-brand" aria-label={`Select ${r.customer} ${r.sub.split(" · ")[0]}`} />
+                </label>
+              )}
+              <Link href={`/app/invoices/${r.id}`} className={cn("flex min-w-0 flex-1 items-center gap-3 py-3.5 pr-4 hover:bg-canvas sm:pr-5", selecting ? "pl-2" : "pl-4 sm:pl-5")}>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold">{r.customer}</p>
                   <p className="text-sm text-muted">{r.sub}</p>
@@ -74,7 +88,7 @@ export function InvoiceList({ rows, toolbar, empty }: { rows: InvoiceRow[]; tool
         })}
       </ul>
 
-      {selected.size > 0 && (
+      {selecting && selected.size > 0 && (
         <form
           onSubmit={(e) => {
             // Each submit button carries its own op, so the action never depends on a state update landing first.
