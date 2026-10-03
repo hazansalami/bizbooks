@@ -9,16 +9,17 @@ export async function runRecurringExpense(id: string) {
   if (!r || r.status !== "ACTIVE") return null;
   const next = advance(r.nextRunAt, r.frequency);
   const ended = r.endAt != null && next > r.endAt;
-  const [expense] = await db.$transaction([
-    db.expense.create({
+  return db.$transaction(async (tx) => {
+    // Claim this period first, so an overlapping run (a cron retry) can't log the same expense twice.
+    const claimed = await tx.recurringExpense.updateMany({ where: { id: r.id, status: "ACTIVE", nextRunAt: r.nextRunAt }, data: { nextRunAt: next, status: ended ? "ENDED" : "ACTIVE" } });
+    if (claimed.count !== 1) return null;
+    return tx.expense.create({
       data: {
         businessId: r.businessId, date: r.nextRunAt, amount: r.amount, vatAmount: r.vatAmount, category: r.category,
         vendor: r.vendor, note: r.title, method: r.method, recurringExpenseId: r.id,
         // As a bill it waits in "Bills you owe" until someone pays it; otherwise it's logged as paid.
         paid: !r.asBill, dueDate: r.asBill ? addDays(r.nextRunAt, r.dueInDays) : null,
       },
-    }),
-    db.recurringExpense.update({ where: { id: r.id }, data: { nextRunAt: next, status: ended ? "ENDED" : "ACTIVE" } }),
-  ]);
-  return expense;
+    });
+  });
 }

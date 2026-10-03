@@ -57,7 +57,7 @@ export default async function ReferPage() {
             {[
               <>Share your link, or just keep sending invoices: the “Sent with BizBooks” line on them carries your link.</>,
               <>They get <strong className="text-ink">{TRIAL.referredDays} days of Pro free</strong>, double the usual trial.</>,
-              <>Once they&apos;re up and running (they send {REFERRAL.minInvoices} invoices to {REFERRAL.minClients} or more clients and a client opens one, or they take a payment through BizBooks Payments), you get <strong className="text-ink">{REFERRAL.rewardMonths} months of Pro and {REFERRAL.rewardFeeFree} fee-free payments</strong>.</>,
+              <>Once they&apos;re up and running (they send {REFERRAL.minInvoices} invoices to {REFERRAL.minClients} or more clients and a client opens one, or a client pays them online), you get <strong className="text-ink">{REFERRAL.rewardMonths} months of Pro and {REFERRAL.rewardFeeFree} fee-free payments</strong>. After your first {REFERRAL.autoQualifyWithoutPayment}, referrals without an online payment get a quick check by our team first.</>,
             ].map((t, i) => (
               <li key={i} className="flex gap-3">
                 <span className="grid size-7 shrink-0 place-items-center rounded-full bg-brand-wash text-sm font-bold text-brand-deep">{i + 1}</span>

@@ -7,7 +7,7 @@ Prices in Nigerian naira (NGN). No automatic charges: Pro is paid monthly or yea
 - After the trial: the Free plan; data is kept and extras pause.
 
 ## Referral programme
-- Referrer earns 3 months of Pro and 10 fee-free BizBooks Payments per referred business that gets going (3 invoices to 2+ clients with one opened, or a payment through BizBooks Payments, within 60 days). Milestones: 3 referrals = a year of Pro; 10 = Pro for life.
+- Referrer earns 3 months of Pro and 10 fee-free BizBooks Payments per referred business that gets going (3 invoices sent to 2+ clients with one opened, or a client paying online, within 60 days). After a referrer's first 2, referrals without an online payment are reviewed by BizBooks before the reward. Milestones: 3 referrals = a year of Pro; 10 = Pro for life.
 
 ## Free
 - Price: ₦0/month

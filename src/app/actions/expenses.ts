@@ -58,8 +58,9 @@ export async function saveExpense(_: FormState, form: FormData): Promise<FormSta
   if (id) {
     const e = await db.expense.findFirst({ where: { id, businessId: business.id } });
     if (!e) return { message: "Expense not found." };
-    // Editing a bill that was already paid keeps it paid.
-    const billFields = e.paid && !bill.paid ? bill : e.paid ? {} : bill;
+    // A paid expense stays paid (the form doesn't offer turning it back into a bill, and neither does the server).
+    // A bill marked paid while editing counts as paid today, so cash flow puts it on the day the money left.
+    const billFields = e.paid ? {} : bill.paid ? { paid: true, paidAt: new Date() } : bill;
     await db.expense.update({ where: { id }, data: { ...data, ...billFields, receipt: receipt || e.receipt } });
   } else {
     // "Repeat" sets up the schedule and records this one as its first entry.
@@ -105,6 +106,7 @@ export async function saveRecurringExpense(_: FormState, form: FormData): Promis
   const nextRunAt = dateOrNull(form, "nextRunAt");
   if (!nextRunAt) errors.nextRunAt = "Choose when it's next due.";
   const vat = parseAmount(values.vatAmount) || 0;
+  if (vat < 0 || vat > amount) errors.vatAmount = "VAT can't be more than the amount.";
   if (Object.keys(errors).length) return { errors, values };
   const id = str(form, "id");
   if (!id && !(await recurringAllowed(business))) {

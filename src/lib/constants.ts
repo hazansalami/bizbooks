@@ -198,7 +198,7 @@ export const REFERRAL = {
   // Pro time can bank up to this far ahead (lifetime Pro is the exception).
   bankCapMonths: 24,
   // A referral qualifies once the referred business sends 3 invoices to 2+ clients and a client opens one,
-  // or takes a payment through BizBooks Payments, within this many days of joining.
+  // or a client pays it online (BizBooks Payments or its own gateway), within this many days of joining.
   qualifyWithinDays: 60,
   minInvoices: 3,
   minClients: 2,
