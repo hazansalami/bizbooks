@@ -404,6 +404,8 @@ model Expense {
   recurringExpense   RecurringExpense? @relation(fields: [recurringExpenseId], references: [id], onDelete: SetNull)
   payRunId   String?
   payRun     PayRun?  @relation(fields: [payRunId], references: [id], onDelete: Cascade)
+  // The person this payroll expense is for, so paying (or un-paying) one person touches only their entries.
+  payItemId  String?
   createdAt  DateTime @default(now())
 
   @@index([businessId, date])
@@ -481,7 +483,7 @@ model PayRun {
   // "2026-10"
   period          String
   payDate         DateTime
-  // DRAFT | PAID
+  // DRAFT | PARTIAL (some people paid) | PAID (everyone paid)
   status          String    @default("DRAFT")
   gross           Float     @default(0)
   paye            Float     @default(0)
@@ -521,6 +523,8 @@ model PayItem {
   wht             Float    @default(0)
   // PAYE wasn't deducted because the employee handles their own tax (Employee.paye was off for this run).
   payeByEmployee  Boolean  @default(false)
+  // When this person was paid. Null until then, so a run can be paid in parts.
+  paidAt          DateTime?
   kind            String   @default("EMPLOYEE")
   net             Float
   // Link for the employee's own payslip page.
