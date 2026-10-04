@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireBusiness } from "@/lib/auth";
 import { applyPayment, createInvoice, emailInvoice, loadFullInvoice, markSent, refreshInvoicePaid } from "@/lib/invoices";
-import { balanceDue, computeTotals, parseAmount, round2, type LineInput } from "@/lib/money";
+import { balanceDue, computeTotals, money, parseAmount, round2, type LineInput } from "@/lib/money";
 import { EMAIL_CAP, FREE_RECURRING_LIMIT, FREQUENCIES, PAYMENT_METHODS } from "@/lib/constants";
 import { advance } from "@/lib/recurring";
 import { isCurrency } from "@/lib/currency";
@@ -214,6 +214,9 @@ export async function recordPayment(_: FormState, form: FormData): Promise<FormS
   const values = { amount: str(form, "amount"), method, note: str(form, "note"), paidAt: str(form, "paidAt") };
   if (!(amount > 0)) return { errors: { amount: "Enter the amount you received." }, values };
   if (!(method in PAYMENT_METHODS)) return { errors: { method: "Choose how they paid." }, values };
+  // More than is owed is almost always a typo (an extra zero), and it would quietly inflate income.
+  const due = balanceDue(inv);
+  if (amount > due + 0.005) return { errors: { amount: `That's more than the ${money(due, inv.currency)} still owed on this invoice. Check the amount.` }, values };
   const dayRate = parseAmount(str(form, "exchangeRate"));
   const r = await applyPayment(inv.id, { amount, method, paidAt: dateOrNull(form, "paidAt") ?? new Date(), note: str(form, "note") || null, exchangeRate: dayRate > 0 ? dayRate : undefined });
   if (!r.ok) return { message: r.error, values };

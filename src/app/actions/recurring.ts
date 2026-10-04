@@ -39,6 +39,7 @@ export async function saveSchedule(_: FormState, form: FormData): Promise<FormSt
   const endAt = ends === "on" ? dateOrNull(form, "endAt") : null;
   if (ends === "after" && !(maxRuns && maxRuns > 0)) errors.maxRuns = "Enter how many invoices to send.";
   if (ends === "on" && !endAt) errors.endAt = "Choose the last date.";
+  else if (endAt && startAt && endAt < startAt) errors.endAt = "The last date can't be before the first invoice.";
 
   let items: { description: string; details: string | null; quantity: number; unitPrice: number }[] = [];
   try {
