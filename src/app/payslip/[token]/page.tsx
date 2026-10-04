@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { amountInWords, naira } from "@/lib/money";
+import { TAX } from "@/lib/constants";
 import { periodLabel } from "@/lib/payroll";
 import { formatDate, initials } from "@/lib/utils";
 import { PrintButton } from "@/components/form-bits";
@@ -57,6 +58,13 @@ export default async function Payslip({ params }: { params: Promise<{ token: str
         <p className="text-right text-xs italic text-muted">{amountInWords(item.net)}</p>
         {!contractor && item.pensionEmployer > 0 && (
           <p className="mt-6 rounded-xl bg-canvas p-3 text-sm text-ink-soft">Your employer also paid <strong className="num text-ink">{naira(item.pensionEmployer)}</strong> into your pension this month, on top of your pay.</p>
+        )}
+        {!contractor && !item.payeByEmployee && item.paye === 0 && (
+          <p className="mt-2 rounded-xl border border-line p-3 text-sm text-ink-soft">
+            {item.gross <= TAX.minimumWageMonthly
+              ? "No PAYE: pay at or below the national minimum wage is exempt from income tax under the Nigeria Tax Act 2025."
+              : "No PAYE: your taxable income is within the tax-free band (the first ₦800,000 a year)."}
+          </p>
         )}
         {item.payeByEmployee && (
           <p className="mt-2 rounded-xl border border-line p-3 text-sm text-ink-soft">No PAYE was deducted from this pay: you've agreed to settle your own income tax with your state tax office.</p>

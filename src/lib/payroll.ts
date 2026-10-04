@@ -12,9 +12,27 @@ import { round2 } from "./money";
 
 /** paye: false when the employee settles their own income tax, so none is deducted (defaults to deducting it). */
 export type PayInput = { kind: string; monthlyGross: number; pension: boolean; nhf: boolean; annualRent: number; whtRate: number; paye?: boolean };
+/**
+ * Why PAYE is what it is: DEDUCTED (tax worked out), MIN_WAGE (exempt: earns the minimum wage or less),
+ * TAX_FREE (taxable income within the ₦800,000-a-year 0% band), SELF (employee handles their own tax), NONE (contractor).
+ */
+export type PayeStatus = "DEDUCTED" | "MIN_WAGE" | "TAX_FREE" | "SELF" | "NONE";
+
 export type PayResult = {
   gross: number; pensionEmployee: number; pensionEmployer: number; nhf: number; rentRelief: number; paye: number; wht: number; net: number;
+  payeStatus: PayeStatus;
 };
+
+/** What to show on the PAYE line: the deduction, or plainly why there isn't one (never "−₦0"). */
+export function payeLine(p: { paye: number; payeStatus: PayeStatus }, fmt: (n: number) => string) {
+  switch (p.payeStatus) {
+    case "DEDUCTED": return `−${fmt(p.paye)}`;
+    case "MIN_WAGE": return "Exempt (minimum wage)";
+    case "TAX_FREE": return "None (under the tax-free band)";
+    case "SELF": return "Employee pays";
+    default: return "—";
+  }
+}
 
 /** Tax on a yearly taxable income, band by band. */
 export function annualIncomeTax(taxable: number) {
@@ -33,17 +51,20 @@ export function computePay(e: PayInput): PayResult {
   if (e.kind === "CONTRACTOR") {
     // Contractors aren't on PAYE or pension: the company deducts withholding tax and remits it instead.
     const wht = round2((gross * e.whtRate) / 100);
-    return { gross, pensionEmployee: 0, pensionEmployer: 0, nhf: 0, rentRelief: 0, paye: 0, wht, net: round2(gross - wht) };
+    return { gross, pensionEmployee: 0, pensionEmployer: 0, nhf: 0, rentRelief: 0, paye: 0, wht, net: round2(gross - wht), payeStatus: "NONE" };
   }
   const pensionEmployee = e.pension ? round2((gross * TAX.pensionEmployee) / 100) : 0;
   const pensionEmployer = e.pension ? round2((gross * TAX.pensionEmployer) / 100) : 0;
   const nhf = e.nhf ? round2((gross * TAX.nhf) / 100) : 0;
   const rentReliefYear = Math.min((Math.max(0, e.annualRent) * TAX.rentReliefRate) / 100, TAX.rentReliefCap);
   const taxableYear = Math.max(0, gross * 12 - (pensionEmployee + nhf) * 12 - rentReliefYear);
-  const paye = e.paye === false ? 0 : round2(annualIncomeTax(taxableYear) / 12);
+  const minWage = gross <= TAX.minimumWageMonthly;
+  const tax = round2(annualIncomeTax(taxableYear) / 12);
+  const payeStatus: PayeStatus = e.paye === false ? "SELF" : minWage ? "MIN_WAGE" : tax > 0 ? "DEDUCTED" : "TAX_FREE";
+  const paye = payeStatus === "DEDUCTED" ? tax : 0;
   return {
     gross, pensionEmployee, pensionEmployer, nhf, rentRelief: round2(rentReliefYear / 12), paye, wht: 0,
-    net: round2(gross - pensionEmployee - nhf - paye),
+    net: round2(gross - pensionEmployee - nhf - paye), payeStatus,
   };
 }
 

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Mail } from "lucide-react";
-import { computePay } from "@/lib/payroll";
+import { computePay, payeLine } from "@/lib/payroll";
 import { companyTax, employerCost, grossUp, vatSplit } from "@/lib/calc";
 import { computeTotals, naira, parseAmount } from "@/lib/money";
 import { TAX } from "@/lib/constants";
@@ -101,7 +101,7 @@ export function PayeCalculator() {
   const p = useMemo(() => computePay({ kind: "EMPLOYEE", monthlyGross: monthly, pension, nhf, annualRent: parseAmount(rent) || 0, whtRate: 0 }), [monthly, pension, nhf, rent]);
   const annualTaxable = Math.max(0, monthly * 12 - (p.pensionEmployee + p.nhf) * 12 - p.rentRelief * 12);
   const effective = monthly > 0 ? (p.paye / monthly) * 100 : 0;
-  const lines: Line[] = [["Gross monthly pay", n(p.gross)], ["Pension (8%)", `−${n(p.pensionEmployee)}`], ...(nhf ? [["NHF (2.5%)", `−${n(p.nhf)}`] as Line] : []), ["Monthly PAYE", `−${n(p.paye)}`], ["Annual PAYE", n(p.paye * 12)], ["Effective tax rate", `${effective.toFixed(1)}%`], ["Monthly take-home", n(p.net)]];
+  const lines: Line[] = [["Gross monthly pay", n(p.gross)], ["Pension (8%)", `−${n(p.pensionEmployee)}`], ...(nhf ? [["NHF (2.5%)", `−${n(p.nhf)}`] as Line] : []), ["Monthly PAYE", payeLine(p, n)], ["Annual PAYE", n(p.paye * 12)], ["Effective tax rate", `${effective.toFixed(1)}%`], ["Monthly take-home", n(p.net)]];
 
   return (
     <Shell
@@ -115,7 +115,7 @@ export function PayeCalculator() {
       result={<>
         <p className="text-sm font-semibold text-muted">Monthly take-home pay</p>
         <p className="num text-4xl font-bold tracking-tight">{n(p.net)}</p>
-        <Breakdown lines={[["Gross pay", n(p.gross)], ...(pension ? [["Pension (8%)", `−${n(p.pensionEmployee)}`] as Line] : []), ...(nhf ? [["NHF (2.5%)", `−${n(p.nhf)}`] as Line] : []), ["PAYE tax", `−${n(p.paye)}`]]} total={["Take-home", n(p.net)]} />
+        <Breakdown lines={[["Gross pay", n(p.gross)], ...(pension ? [["Pension (8%)", `−${n(p.pensionEmployee)}`] as Line] : []), ...(nhf ? [["NHF (2.5%)", `−${n(p.nhf)}`] as Line] : []), ["PAYE tax", payeLine(p, n)]]} total={["Take-home", n(p.net)]} />
         <dl className="num mt-5 grid grid-cols-2 gap-3 text-sm">
           <div className="rounded-xl bg-paper p-3"><dt className="text-xs text-muted">Annual PAYE</dt><dd className="font-bold">{n(p.paye * 12)}</dd></div>
           <div className="rounded-xl bg-paper p-3"><dt className="text-xs text-muted">Effective tax rate</dt><dd className="font-bold">{effective.toFixed(1)}%</dd></div>
@@ -136,7 +136,7 @@ export function NetToGrossCalculator() {
   const [pension, setPension] = useState(true);
   const [nhf, setNhf] = useState(false);
   const p = useMemo(() => grossUp(parseAmount(net) || 0, { pension, nhf, annualRent: parseAmount(rent) || 0 }), [net, pension, nhf, rent]);
-  const lines: Line[] = [["Target take-home", n(parseAmount(net) || 0)], ["Gross monthly salary", n(p.gross)], ["Pension (8%)", n(p.pensionEmployee)], ["PAYE", n(p.paye)], ["Employer pension (10%)", n(p.pensionEmployer)], ["Annual gross", n(p.gross * 12)]];
+  const lines: Line[] = [["Target take-home", n(parseAmount(net) || 0)], ["Gross monthly salary", n(p.gross)], ["Pension (8%)", n(p.pensionEmployee)], ["PAYE", p.paye ? n(p.paye) : payeLine(p, n)], ["Employer pension (10%)", n(p.pensionEmployer)], ["Annual gross", n(p.gross * 12)]];
   return (
     <Shell
       inputs={<>
@@ -149,7 +149,7 @@ export function NetToGrossCalculator() {
         <p className="text-sm font-semibold text-muted">Gross monthly salary to offer</p>
         <p className="num text-4xl font-bold tracking-tight">{n(p.gross)}</p>
         <p className="num mt-1 text-sm text-muted">{n(p.gross * 12)} a year</p>
-        <Breakdown lines={[["Gross salary", n(p.gross)], ...(pension ? [["Pension (8%)", `−${n(p.pensionEmployee)}`] as Line] : []), ...(nhf ? [["NHF", `−${n(p.nhf)}`] as Line] : []), ["PAYE", `−${n(p.paye)}`]]} total={["Take-home", n(p.net)]} />
+        <Breakdown lines={[["Gross salary", n(p.gross)], ...(pension ? [["Pension (8%)", `−${n(p.pensionEmployee)}`] as Line] : []), ...(nhf ? [["NHF", `−${n(p.nhf)}`] as Line] : []), ["PAYE", payeLine(p, n)]]} total={["Take-home", n(p.net)]} />
         {pension && <p className="mt-4 rounded-xl bg-paper p-3 text-sm">The company also pays <strong className="num">{n(p.pensionEmployer)}</strong> employer pension each month.</p>}
         <EmailResults tool="net-to-gross-salary-calculator" lines={lines} inputs={`${n(parseAmount(net) || 0)} take-home a month`} />
       </>}

@@ -5,7 +5,7 @@ import { requireBusiness } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { naira } from "@/lib/money";
 import { periodLabel } from "@/lib/payroll";
-import { TAX_DEADLINES } from "@/lib/constants";
+import { TAX, TAX_DEADLINES } from "@/lib/constants";
 import { dateInput, formatDate } from "@/lib/utils";
 import { deletePayRun, markPayRunPaid, refreshPayRun, reopenPayRun } from "@/app/actions/payroll";
 import { Badge, buttonClass, Notice, PageHeader, Panel, Stat } from "@/components/ui";
@@ -95,7 +95,7 @@ export default async function PayRunPage({ params }: { params: Promise<{ id: str
                 <td className="p-3"><p className="font-semibold">{i.fullName}</p><p className="text-xs text-muted">{i.kind === "CONTRACTOR" ? "Contractor" : i.jobTitle ?? "Staff"}</p></td>
                 <td className="p-3 text-right">{naira(i.gross)}</td>
                 <td className="p-3 text-right">{i.pensionEmployee ? `−${naira(i.pensionEmployee)}` : "—"}</td>
-                <td className="p-3 text-right">{i.payeByEmployee ? <span className="text-muted" title="This employee settles their own income tax">Employee pays</span> : `−${naira(i.paye + i.wht)}`}</td>
+                <td className="p-3 text-right">{i.payeByEmployee ? <span className="text-muted" title="This employee settles their own income tax">Employee pays</span> : i.paye + i.wht > 0 ? `−${naira(i.paye + i.wht)}` : <span className="text-muted">{i.kind === "EMPLOYEE" ? (i.gross <= TAX.minimumWageMonthly ? "Exempt" : "None") : "—"}</span>}</td>
                 <td className="p-3 text-right font-bold">{naira(i.net)}</td>
                 <td className="p-3 text-right"><Link href={`/payslip/${i.publicToken}`} target="_blank" className="inline-flex min-h-9 items-center gap-1 font-semibold text-brand hover:underline"><FileText className="size-4" aria-hidden />Payslip</Link></td>
               </tr>
