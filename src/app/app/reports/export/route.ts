@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
     db.expense.findMany({ where: { businessId: business.id, date: { gte: from, lt: to } }, orderBy: { date: "asc" } }),
   ]);
   // Money columns are in naira. Foreign-currency payments also show the original amount and the rate used.
-  const rows: unknown[][] = [["Date", "Type", "Description", "Customer / supplier", "Reference", "Method", "Money in (NGN)", "Money out (NGN)", "VAT (NGN)", "Currency", "Original amount", "Exchange rate"]];
+  // Expenses are listed by their own date; "Status" and "Paid on" show which bills are still unpaid (no money out yet).
+  const rows: unknown[][] = [["Date", "Type", "Description", "Customer / supplier", "Reference", "Method", "Money in (NGN)", "Money out (NGN)", "VAT (NGN)", "Currency", "Original amount", "Exchange rate", "Status", "Paid on"]];
   for (const pay of payments) {
     const inv = pay.invoice;
     const vat = inv && inv.total - inv.whtAmount > 0 ? ((inv.vatAmount * pay.amount) / (inv.total - inv.whtAmount)) * pay.exchangeRate : 0;
@@ -34,10 +35,14 @@ export async function GET(request: NextRequest) {
     rows.push([
       day(pay.paidAt), "Income", inv ? `Payment for ${inv.number}` : "Payment", inv?.customer.name, pay.reference ?? inv?.number, PAYMENT_METHODS[pay.method] ?? pay.method,
       (pay.amount * pay.exchangeRate).toFixed(2), "", vat.toFixed(2), currency, pay.amount.toFixed(2), currency === "NGN" ? "1" : String(pay.exchangeRate),
+      "Received", day(pay.paidAt),
     ]);
   }
   for (const e of expenses) {
-    rows.push([day(e.date), "Expense", [e.category, e.note].filter(Boolean).join(": "), e.vendor, "", PAYMENT_METHODS[e.method] ?? e.method, "", e.amount.toFixed(2), e.vatAmount.toFixed(2), "NGN", e.amount.toFixed(2), "1"]);
+    rows.push([
+      day(e.date), e.paid ? "Expense" : "Bill (unpaid)", [e.category, e.note].filter(Boolean).join(": "), e.vendor, "", PAYMENT_METHODS[e.method] ?? e.method,
+      "", e.amount.toFixed(2), e.vatAmount.toFixed(2), "NGN", e.amount.toFixed(2), "1", e.paid ? "Paid" : "Unpaid", e.paid ? day(e.paidAt ?? e.date) : "",
+    ]);
   }
   rows.sort((a, b) => (a[0] === "Date" ? -1 : b[0] === "Date" ? 1 : String(a[0]).localeCompare(String(b[0]))));
   const csv = "﻿" + rows.map((r) => r.map(cell).join(",")).join("\r\n");

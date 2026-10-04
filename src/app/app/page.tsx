@@ -77,12 +77,13 @@ export default async function Overview({ searchParams }: { searchParams: Promise
     accrualTotals(id, new Date(now.getFullYear() - 1, 0, 1), yearStart),
     db.paymentClaim.findMany({ where: { status: "PENDING", invoice: { businessId: id } }, include: { invoice: { include: { customer: true } } }, orderBy: { createdAt: "desc" } }),
     db.employee.findMany({ where: { businessId: id, status: "ACTIVE" } }),
-    db.payRun.findMany({ where: { businessId: id }, orderBy: { period: "desc" }, take: 2 }),
+    db.payRun.findMany({ where: { businessId: id }, orderBy: { period: "desc" }, take: 2, include: { items: { where: { paidAt: null }, select: { gross: true, pensionEmployer: true } } } }),
     db.recurringExpense.findMany({ where: { businessId: id, status: "ACTIVE", nextRunAt: { lte: horizon } }, orderBy: { nextRunAt: "asc" } }),
     taxObligations(business, 2),
     Promise.all([
       db.bankAccount.count({ where: { businessId: id } }),
-      db.gateway.count({ where: { businessId: id, enabled: true } }),
+      // Online payments are on with either the business's own gateway or BizBooks Payments.
+      Promise.all([db.gateway.count({ where: { businessId: id, enabled: true } }), db.paymentAccount.count({ where: { businessId: id, status: "ACTIVE" } })]).then(([g, a]) => g + a),
       db.invoice.count({ where: { businessId: id, sentAt: { not: null } } }),
       db.recurringExpense.count({ where: { businessId: id } }),
     ]),
@@ -97,9 +98,13 @@ export default async function Overview({ searchParams }: { searchParams: Promise
     const period = runs.some((r) => r.period === periodOf(now) && r.status === "PAID") ? periodOf(addMonths(now, 1)) : periodOf(now);
     const payDate = payDateFor(period, business.payDay);
     if (payDate <= horizon) {
-      const cost = team.reduce((s, e) => { const p = computePay(e); return s + p.gross + p.pensionEmployer; }, 0);
       const run = runs.find((r) => r.period === period);
-      upcoming.push({ date: payDate, label: "Payroll", sub: `${team.length} people${run ? "" : " · not run yet"}`, amount: cost, direction: "out", href: run ? `/app/payroll/runs/${run.id}` : "/app/payroll" });
+      // Once a run exists, what's left is its unpaid people at the run's own figures (it may be partly paid);
+      // before that, an estimate from the current team.
+      const left = run ? run.items : team.map((e) => computePay(e));
+      const cost = left.reduce((s, p) => s + p.gross + p.pensionEmployer, 0);
+      const people = run ? run.items.length : team.length;
+      if (people > 0) upcoming.push({ date: payDate, label: "Payroll", sub: `${people} ${people === 1 ? "person" : "people"}${run ? (run.status === "PARTIAL" ? " left to pay" : "") : " · not run yet"}`, amount: cost, direction: "out", href: run ? `/app/payroll/runs/${run.id}` : "/app/payroll" });
     }
   }
   for (const r of recurring) upcoming.push({ date: r.nextRunAt, label: r.title, sub: r.asBill ? "Recurring bill" : "Recurring", amount: r.amount, direction: "out", href: `/app/expenses/recurring/${r.id}` });
@@ -113,7 +118,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
 
   const checklist = [
     { done: banks > 0, label: "Add the company bank account", href: "/app/settings/payments" },
-    { done: gateways > 0, label: "Connect Paystack or Flutterwave", href: "/app/settings/payments" },
+    { done: gateways > 0, label: "Turn on online payments", href: "/app/settings/payments" },
     { done: sent > 0, label: "Send your first invoice", href: "/app/invoices/new" },
     { done: team.length > 0, label: "Add your team to payroll", href: "/app/payroll/team/new" },
     { done: recurringCount > 0, label: "Set up rent, software and other fixed costs", href: "/app/expenses/recurring/new" },
