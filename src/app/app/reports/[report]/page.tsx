@@ -314,7 +314,10 @@ export default async function Report({ params, searchParams }: Props) {
   }
 
   if (slug === "payroll-summary") {
-    const runs = await db.payRun.findMany({ where: { businessId: id, status: "PAID", payDate: { gte: from, lt: to } }, include: { items: true }, orderBy: { period: "asc" } });
+    // People actually paid (a run can be paid in parts); run totals are rebuilt from them.
+    const paidRuns = await db.payRun.findMany({ where: { businessId: id, status: { in: ["PAID", "PARTIAL"] }, payDate: { gte: from, lt: to } }, include: { items: { where: { paidAt: { not: null } } } }, orderBy: { period: "asc" } });
+    const total = (items: (typeof paidRuns)[number]["items"], k: "gross" | "paye" | "pensionEmployee" | "pensionEmployer" | "wht" | "net") => round2(items.reduce((s, i) => s + i[k], 0));
+    const runs = paidRuns.map((r) => ({ ...r, gross: total(r.items, "gross"), paye: total(r.items, "paye"), pensionEmployee: total(r.items, "pensionEmployee"), pensionEmployer: total(r.items, "pensionEmployer"), wht: total(r.items, "wht"), net: total(r.items, "net") }));
     const people = new Map<string, { name: string; gross: number; paye: number; pension: number; wht: number; net: number }>();
     for (const r of runs) for (const i of r.items) {
       const p = people.get(i.employeeId) ?? people.set(i.employeeId, { name: i.fullName, gross: 0, paye: 0, pension: 0, wht: 0, net: 0 }).get(i.employeeId)!;
@@ -329,7 +332,7 @@ export default async function Report({ params, searchParams }: Props) {
         <h2 className="text-lg">By person</h2>
         <Table head={["Name", "Gross", "PAYE", "Pension", "WHT", "Take-home"]}
           rows={[...people.values()].sort((a, b) => b.gross - a.gross).map((p) => [p.name, naira(round2(p.gross)), naira(round2(p.paye)), naira(round2(p.pension)), naira(round2(p.wht)), naira(round2(p.net))])} />
-        <p className="text-sm text-muted">Only pay runs marked as paid are included. Use the PAYE column for your annual employer return (Form H1).</p>
+        <p className="text-sm text-muted">Only people marked as paid are included. Use the PAYE column for your annual employer return (Form H1).</p>
       </div>
     );
   }

@@ -5,6 +5,7 @@ import { grantTrialBonus } from "@/lib/growth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import type { Prisma } from "@/generated/prisma/client";
 import { requireBusiness, type CurrentBusiness } from "@/lib/auth";
 import { isPro } from "@/lib/plan";
 import { computePay, payDateFor, periodLabel } from "@/lib/payroll";
@@ -146,43 +147,79 @@ export async function refreshPayRun(form: FormData) {
   revalidatePath(`/app/payroll/runs/${run.id}`);
 }
 
+/** Run status from its people: everyone paid, some paid, or nobody yet. */
+async function settleRunStatus(tx: Prisma.TransactionClient, runId: string) {
+  const [total, paid, last] = await Promise.all([
+    tx.payItem.count({ where: { payRunId: runId } }),
+    tx.payItem.count({ where: { payRunId: runId, paidAt: { not: null } } }),
+    tx.payItem.findFirst({ where: { payRunId: runId, paidAt: { not: null } }, orderBy: { paidAt: "desc" }, select: { paidAt: true } }),
+  ]);
+  const status = paid === 0 ? "DRAFT" : paid < total ? "PARTIAL" : "PAID";
+  await tx.payRun.update({ where: { id: runId }, data: { status, paidAt: status === "PAID" ? last?.paidAt ?? new Date() : null } });
+}
+
 /**
- * The owner has paid salaries from their own bank. Record the cost in the books so profit and
- * cash flow include payroll without anyone entering it twice.
+ * The owner has paid some or all of the team from their own bank. Each person paid gets their own salary
+ * (or contractor fee) and employer pension expense, so profit and cash flow include payroll without anyone
+ * entering it twice, and one person can be un-paid without touching the others.
+ * Form: "item" (one per person ticked), or op=all for everyone not yet paid; "paidAt" (defaults to the pay date).
  */
 export async function markPayRunPaid(form: FormData) {
   const { business, run } = await ownRun(str(form, "id"));
-  if (run.status !== "DRAFT" || run.items.length === 0) return;
+  const all = str(form, "op") === "all";
+  const picked = new Set(form.getAll("item").map(String));
+  const targets = run.items.filter((i) => !i.paidAt && (all || picked.has(i.id)));
+  if (!targets.length) return;
+  const paidAt = dateOrNull(form, "paidAt") ?? run.payDate;
   const label = periodLabel(run.period);
-  const staffGross = round2(run.items.filter((i) => i.kind !== "CONTRACTOR").reduce((s, i) => s + i.gross, 0));
-  const contractorGross = round2(run.items.filter((i) => i.kind === "CONTRACTOR").reduce((s, i) => s + i.gross, 0));
-  const lines = [
-    { category: "Salaries & wages", amount: staffGross, note: `${label} payroll (gross, including PAYE and staff pension)` },
-    { category: "Pension (employer)", amount: run.pensionEmployer, note: `${label} employer pension contribution` },
-    { category: "Contractors & freelancers", amount: contractorGross, note: `${label} contractor fees (gross, including WHT)` },
-  ].filter((l) => l.amount > 0);
-  const marked = await db.$transaction(async (tx) => {
-    // Claim the run first, so a double tap can't book the payroll expenses twice.
-    const claimed = await tx.payRun.updateMany({ where: { id: run.id, status: "DRAFT" }, data: { status: "PAID", paidAt: new Date() } });
-    if (claimed.count !== 1) return false;
-    await tx.expense.createMany({
-      data: lines.map((l) => ({ businessId: business.id, date: run.payDate, amount: l.amount, category: l.category, vendor: "Payroll", note: l.note, payRunId: run.id })),
-    });
-    return true;
+  await db.$transaction(async (tx) => {
+    for (const i of targets) {
+      // Claim each person first, so a double tap can't book their pay twice.
+      const claimed = await tx.payItem.updateMany({ where: { id: i.id, paidAt: null }, data: { paidAt } });
+      if (claimed.count !== 1) continue;
+      const contractor = i.kind === "CONTRACTOR";
+      const lines = [
+        { category: contractor ? "Contractors & freelancers" : "Salaries & wages", amount: i.gross, note: `${label} ${contractor ? "fee (gross, including WHT)" : "salary (gross, including PAYE and staff pension)"}: ${i.fullName}` },
+        { category: "Pension (employer)", amount: i.pensionEmployer, note: `${label} employer pension: ${i.fullName}` },
+      ].filter((l) => l.amount > 0);
+      await tx.expense.createMany({
+        data: lines.map((l) => ({ businessId: business.id, date: paidAt, amount: l.amount, category: l.category, vendor: "Payroll", note: l.note, payRunId: run.id, payItemId: i.id })),
+      });
+    }
+    await settleRunStatus(tx, run.id);
   });
-  if (!marked) return;
   await grantTrialBonus(business.id, "PAYROLL_OR_IMPORT");
   revalidatePath("/app/payroll");
   revalidatePath(`/app/payroll/runs/${run.id}`);
 }
 
+/**
+ * Undo one person's payment: their payroll expenses come off and they're unpaid again.
+ * The item id is bound into the action (a formAction button can't carry its own name/value).
+ */
+export async function unmarkPayItem(itemId: string, form: FormData) {
+  const { run } = await ownRun(str(form, "id"));
+  const item = run.items.find((i) => i.id === itemId);
+  if (!item?.paidAt) return;
+  await db.$transaction(async (tx) => {
+    await tx.expense.deleteMany({ where: { payRunId: run.id, payItemId: item.id } });
+    await tx.payItem.update({ where: { id: item.id }, data: { paidAt: null } });
+    await settleRunStatus(tx, run.id);
+  });
+  revalidatePath("/app/payroll");
+  revalidatePath(`/app/payroll/runs/${run.id}`);
+}
+
+/** Undo the whole run: every payroll expense it added comes off and nobody is marked paid. */
 export async function reopenPayRun(form: FormData) {
   const { run } = await ownRun(str(form, "id"));
-  if (run.status !== "PAID") return;
+  if (run.status === "DRAFT") return;
   await db.$transaction([
     db.expense.deleteMany({ where: { payRunId: run.id } }),
+    db.payItem.updateMany({ where: { payRunId: run.id }, data: { paidAt: null } }),
     db.payRun.update({ where: { id: run.id }, data: { status: "DRAFT", paidAt: null } }),
   ]);
+  revalidatePath("/app/payroll");
   revalidatePath(`/app/payroll/runs/${run.id}`);
 }
 

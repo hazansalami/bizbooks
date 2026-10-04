@@ -61,7 +61,7 @@ export default async function Payroll() {
         <div>
           <h2 className="text-lg">{periodLabel(nextPeriod)} payroll</h2>
           <p className="text-muted">
-            {nextRun ? (nextRun.status === "PAID" ? "Paid." : "Draft ready. Check it, pay from your bank, then mark it paid.") : `${team.length} people, about ${naira(Math.round(monthlyNet))} to pay out.`}
+            {nextRun ? (nextRun.status === "PAID" ? "Paid." : nextRun.status === "PARTIAL" ? "Partly paid. Mark the rest as you pay them." : "Draft ready. Check it, pay from your bank, then mark it paid.") : `${team.length} people, about ${naira(Math.round(monthlyNet))} to pay out.`}
           </p>
         </div>
         {nextRun ? (
@@ -89,7 +89,7 @@ export default async function Payroll() {
                     <p className="font-semibold">{periodLabel(r.period)}</p>
                     <p className="text-sm text-muted">Paid out {naira(r.net)} · PAYE {naira(r.paye)}</p>
                   </div>
-                  <Badge tone={r.status === "PAID" ? "brand" : "sun"}>{r.status === "PAID" ? "Paid" : "Draft"}</Badge>
+                  <Badge tone={r.status === "PAID" ? "brand" : "sun"}>{r.status === "PAID" ? "Paid" : r.status === "PARTIAL" ? "Partly paid" : "Draft"}</Badge>
                 </Link>
               </li>
             ))}

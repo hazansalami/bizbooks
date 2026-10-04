@@ -35,7 +35,8 @@ export async function taxObligations(business: { id: string; vatRegistered: bool
   const now = new Date();
   const [filings, runs] = await Promise.all([
     db.taxFiling.findMany({ where: { businessId: business.id } }),
-    db.payRun.findMany({ where: { businessId: business.id, status: "PAID" }, orderBy: { period: "desc" }, take: months + 1 }),
+    // Runs with anyone paid; amounts come from the people actually paid (a run can be paid in parts).
+    db.payRun.findMany({ where: { businessId: business.id, status: { in: ["PAID", "PARTIAL"] } }, include: { items: { where: { paidAt: { not: null } } } }, orderBy: { period: "desc" }, take: months + 1 }),
   ]);
   const filed = (kind: string, period: string) => filings.find((f) => f.kind === kind && f.period === period);
   const out: Obligation[] = [];
@@ -55,7 +56,9 @@ export async function taxObligations(business: { id: string; vatRegistered: bool
     }
   }
 
-  for (const r of runs) {
+  for (const run of runs) {
+    const sum = (k: "paye" | "pensionEmployee" | "pensionEmployer" | "wht") => round2(run.items.reduce((s, i) => s + i[k], 0));
+    const r = { ...run, paye: sum("paye"), pensionEmployee: sum("pensionEmployee"), pensionEmployer: sum("pensionEmployer"), wht: sum("wht") };
     const [y, m] = r.period.split("-").map(Number);
     const add = (kind: Obligation["kind"], title: string, who: string, amount: number, dueDate: Date) => {
       if (amount <= 0) return;

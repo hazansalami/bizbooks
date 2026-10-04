@@ -21,7 +21,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const narration = `${user.business.name.slice(0, 20)} ${periodLabel(run.period)} pay`;
   const rows: unknown[][] = [["Beneficiary name", "Account number", "Bank", "Amount", "Narration"]];
-  for (const i of run.items) {
+  // While some people are still unpaid, the file is just them (the people left to pay); otherwise everyone.
+  const pending = run.items.filter((i) => !i.paidAt);
+  for (const i of pending.length ? pending : run.items) {
     if (!i.accountNumber) continue;
     rows.push([i.accountName || i.fullName, i.accountNumber, i.bankName, i.net.toFixed(2), narration]);
   }
