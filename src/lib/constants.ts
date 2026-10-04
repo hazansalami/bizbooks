@@ -54,6 +54,9 @@ export const SAVE_OFFER_MONTHS = 3;
 */
 export const TAX = {
   vatRate: 7.5,
+  // Nigeria Tax Act 2025: an employee earning the national minimum wage or less pays no PAYE at all.
+  // National minimum wage: ₦70,000 a month (National Minimum Wage (Amendment) Act 2024).
+  minimumWageMonthly: 70_000,
   smallCompanyTurnover: 100_000_000,
   smallCompanyFixedAssets: 250_000_000,
   standardCitRate: 30,

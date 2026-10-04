@@ -96,11 +96,12 @@ async function fillRun(runId: string, business: CurrentBusiness) {
   // Keep each person's payslip link when a draft run is refreshed: links may already be shared with staff.
   const tokens = new Map((await db.payItem.findMany({ where: { payRunId: runId }, select: { employeeId: true, publicToken: true } })).map((i) => [i.employeeId, i.publicToken]));
   const items = employees.map((e) => {
-    const p = computePay(e);
+    // payeStatus is for display; the pay item stores the amounts (and payeByEmployee) instead.
+    const { payeStatus: _status, ...p } = computePay(e);
     return {
       payRunId: runId, employeeId: e.id, fullName: e.fullName, jobTitle: e.jobTitle, kind: e.kind,
       bankName: e.bankName, accountNumber: e.accountNumber, accountName: e.accountName ?? e.fullName,
-      ...p, publicToken: tokens.get(e.id) ?? randomToken(), payeByEmployee: e.kind === "EMPLOYEE" && !e.paye,
+      ...p, publicToken: tokens.get(e.id) ?? randomToken(), payeByEmployee: _status === "SELF",
     };
   });
   const sum = (k: keyof (typeof items)[number]) => round2(items.reduce((s, i) => s + (i[k] as number), 0));

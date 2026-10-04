@@ -6,7 +6,7 @@ import { SubmitButton, useFormAction, type FormState } from "./form-bits";
 import { Field, Input, Notice, Select } from "./ui";
 import { BANKS, TAX } from "@/lib/constants";
 import { naira, parseAmount } from "@/lib/money";
-import { computePay } from "@/lib/payroll";
+import { computePay, payeLine } from "@/lib/payroll";
 import { cn } from "@/lib/utils";
 
 export type EmployeeInitial = Record<string, string> & { id: string };
@@ -111,7 +111,7 @@ export function EmployeeForm({ initial, payeDefault = true }: { initial?: Employ
           <div className="flex justify-between"><dt>{contractor ? "Fee" : "Gross pay"}</dt><dd className="font-semibold">{naira(p.gross)}</dd></div>
           {!contractor && <div className="flex justify-between text-ink-soft"><dt>Pension (8%)</dt><dd>−{naira(p.pensionEmployee)}</dd></div>}
           {p.nhf > 0 && <div className="flex justify-between text-ink-soft"><dt>NHF</dt><dd>−{naira(p.nhf)}</dd></div>}
-          {!contractor && <div className="flex justify-between text-ink-soft"><dt>PAYE tax</dt><dd>{paye ? `−${naira(p.paye)}` : "Employee pays"}</dd></div>}
+          {!contractor && <div className="flex justify-between gap-3 text-ink-soft"><dt>PAYE tax</dt><dd className="text-right">{payeLine(p, naira)}</dd></div>}
           {contractor && <div className="flex justify-between text-ink-soft"><dt>WHT ({wht}%)</dt><dd>−{naira(p.wht)}</dd></div>}
           <div className="flex justify-between border-t border-line pt-2 text-base font-bold"><dt>Take-home</dt><dd>{naira(p.net)}</dd></div>
           {!contractor && <div className="flex justify-between pt-2 text-muted"><dt>Company pension (10%)</dt><dd>{naira(p.pensionEmployer)}</dd></div>}

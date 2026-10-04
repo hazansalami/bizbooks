@@ -10,6 +10,13 @@ import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { computePay, payDateFor, periodOf } from "../src/lib/payroll";
 
+/** payeStatus is display-only; pay items store the amounts. */
+function withoutStatus<T extends { payeStatus: unknown }>(p: T): Omit<T, "payeStatus"> {
+  const { payeStatus, ...rest } = p;
+  void payeStatus;
+  return rest;
+}
+
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
 const token = () => randomBytes(18).toString("base64url");
 const monthsAgo = (n: number, day: number) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - n); d.setDate(day); return d; };
@@ -88,12 +95,12 @@ async function main() {
     const period = periodOf(monthsAgo(m, 1));
     const payDate = payDateFor(period, 25);
     const items = team.map((e) => ({ e, p: computePay(e) }));
-    const sum = (k: keyof ReturnType<typeof computePay>) => r2(items.reduce((s, x) => s + x.p[k], 0));
+    const sum = (k: Exclude<keyof ReturnType<typeof computePay>, "payeStatus">) => r2(items.reduce((s, x) => s + x.p[k], 0));
     const run = await db.payRun.create({
       data: {
         businessId: b.id, period, payDate, status: "PAID", paidAt: payDate,
         gross: sum("gross"), paye: sum("paye"), pensionEmployee: sum("pensionEmployee"), pensionEmployer: sum("pensionEmployer"), nhf: sum("nhf"), wht: sum("wht"), net: sum("net"),
-        items: { create: items.map(({ e, p }) => ({ employeeId: e.id, fullName: e.fullName, jobTitle: e.jobTitle, kind: e.kind, bankName: e.bankName, accountNumber: e.accountNumber, accountName: e.accountName, ...p, publicToken: token() })) },
+        items: { create: items.map(({ e, p }) => ({ employeeId: e.id, fullName: e.fullName, jobTitle: e.jobTitle, kind: e.kind, bankName: e.bankName, accountNumber: e.accountNumber, accountName: e.accountName, ...withoutStatus(p), publicToken: token() })) },
       },
     });
     const staff = r2(items.filter((x) => x.e.kind !== "CONTRACTOR").reduce((s, x) => s + x.p.gross, 0));
