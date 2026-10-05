@@ -1,5 +1,5 @@
 import {
-  BadgeCent, CalendarClock, Gift, FileSignature, FileText, Home, Landmark, LifeBuoy, LineChart, Receipt, Repeat, Settings, ShoppingCart, Users, UsersRound, Wallet,
+  BadgeCent, CalendarClock, Gift, FileSignature, FileText, Home, Landmark, LifeBuoy, LineChart, Receipt, Repeat, Settings, ShoppingCart, TrendingUp, Users, UsersRound, Wallet,
 } from "lucide-react";
 
 export type Item = { href: string; label: string; icon: typeof Home; exact?: boolean; match?: string[] };
@@ -36,6 +36,7 @@ export const NAV_GROUPS: { title?: string; icon?: typeof Home; items: Item[] }[]
     icon: LineChart,
     items: [
       { href: "/app/reports", label: "Reports", icon: LineChart },
+      { href: "/app/forecast", label: "Cash forecast", icon: TrendingUp },
       { href: "/app/taxes", label: "Taxes", icon: Landmark },
       { href: "/app/advisors", label: "Advisors", icon: LifeBuoy },
     ],
