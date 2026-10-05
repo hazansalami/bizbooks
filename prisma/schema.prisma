@@ -85,6 +85,10 @@ model Business {
   cashBalanceAt        DateTime?
   // Collections: send automatic reminders on WhatsApp too (needs the WhatsApp Cloud API configured).
   whatsappReminders    Boolean   @default(false)
+  // Opt-in: track withholding tax clients deduct, and whether each one became a usable tax credit.
+  whtTracking          Boolean   @default(false)
+  // Opt-in: compliance score and vendor registration pack.
+  complianceTracking   Boolean   @default(false)
   vatRate              Float     @default(7.5)
   invoicePrefix        String    @default("INV")
   nextInvoiceNo        Int       @default(1)
@@ -270,6 +274,8 @@ model Invoice {
   viewedAt        DateTime?
   paidAt          DateTime?
   lastReminderAt  DateTime?
+  // When we last asked this client to remit the WHT they deducted (or send the credit note).
+  whtChasedAt     DateTime?
   reminderCount   Int                @default(0)
   recurringId     String?
   recurring       RecurringSchedule? @relation(fields: [recurringId], references: [id], onDelete: SetNull)
@@ -277,11 +283,12 @@ model Invoice {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
-  items    InvoiceItem[]
-  payments Payment[]
-  events   InvoiceEvent[]
-  claims   PaymentClaim[]
-  promises PaymentPromise[]
+  items      InvoiceItem[]
+  payments   Payment[]
+  events     InvoiceEvent[]
+  claims     PaymentClaim[]
+  promises   PaymentPromise[]
+  whtCredits WhtCredit[]
 
   @@unique([businessId, kind, number])
   @@index([businessId, status])
@@ -723,5 +730,29 @@ model PaymentPromise {
   createdAt   DateTime  @default(now())
 
   @@index([businessId, status])
+  @@index([invoiceId])
+}
+
+/// A WHT credit the company holds: from the tax authority's TaxPro-Max credit list (or added by hand),
+/// matched to the invoice whose deduction it covers. Usable against company income tax.
+model WhtCredit {
+  id         String   @id @default(cuid())
+  businessId String
+  // Who deducted and remitted it, as the credit list shows.
+  payerName  String
+  payerTin   String?
+  // In naira.
+  amount     Float
+  date       DateTime
+  // Credit note / receipt number from TaxPro-Max.
+  reference  String?
+  // TAXPROMAX | MANUAL
+  source     String   @default("TAXPROMAX")
+  invoiceId  String?
+  invoice    Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+
+  @@unique([businessId, source, reference])
+  @@index([businessId, date])
   @@index([invoiceId])
 }

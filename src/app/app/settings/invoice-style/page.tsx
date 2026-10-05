@@ -106,7 +106,7 @@ async function sampleInvoice(businessId: string): Promise<FullInvoice> {
     importSource: null, depositPercent: null, acceptedAt: null, acceptedBy: null, depositForId: null, status: "SENT",
     issueDate: issue, dueDate: addDays(issue, business.paymentTermsDays), currency: "NGN", exchangeRate: 1, subtotal, discount: 0, vatRate, vatAmount,
     whtRate: 0, whtAmount: 0, total: subtotal + vatAmount, amountPaid: 0, notes: null, publicToken: "sample",
-    sentAt: issue, viewedAt: null, paidAt: null, lastReminderAt: null, reminderCount: 0, recurringId: null, convertedFromId: null,
+    sentAt: issue, viewedAt: null, paidAt: null, lastReminderAt: null, whtChasedAt: null, reminderCount: 0, recurringId: null, convertedFromId: null,
     createdAt: issue, updatedAt: issue, items,
     customer: {
       id: "sample", businessId, name: "Arthur Group Ltd", contactName: "Head of Finance", email: "accounts@arthurgroup.ng", phone: null,
