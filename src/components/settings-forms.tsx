@@ -11,10 +11,10 @@ import { ColorPicker, LogoPicker } from "@/app/onboarding/steps";
 type Profile = {
   legalName: string; rcNumber: string; entityType: string; professionalServices: boolean; payDay: number;
   name: string; email: string; phone: string; address: string; city: string; state: string; tin: string; vatRegistered: boolean; vatRate: number;
-  invoicePrefix: string; paymentTermsDays: number; invoiceFooter: string; autoReminders: boolean; logo: string; brandColor: string;
+  invoicePrefix: string; paymentTermsDays: number; invoiceFooter: string; autoReminders: boolean; whatsappReminders: boolean; logo: string; brandColor: string;
 };
 
-export function ProfileForm({ p, pro }: { p: Profile; pro: boolean }) {
+export function ProfileForm({ p, pro, whatsappReady = false }: { p: Profile; pro: boolean; whatsappReady?: boolean }) {
   const { state, onSubmit, pending } = useFormAction<FormState>(saveProfile, {});
   const e = state.errors ?? {};
   const [vat, setVat] = useState(p.vatRegistered);
@@ -75,7 +75,12 @@ export function ProfileForm({ p, pro }: { p: Profile; pro: boolean }) {
         </Field>
         <label className={cn("flex items-start gap-3", !pro && "opacity-70")}>
           <input type="checkbox" name="autoReminders" defaultChecked={p.autoReminders} className="mt-1 size-5 accent-brand" />
-          <span><span className="font-semibold">Send payment reminders automatically</span><span className="block text-sm text-muted">1 day before the due date, then 3 and 7 days after. Email only; stops the moment they pay.{!pro && " Pro feature."}</span></span>
+          <span><span className="font-semibold">Send payment reminders automatically</span><span className="block text-sm text-muted">1 day before the due date, then 3 and 7 days after. Stops the moment they pay.{!pro && " Pro feature."}</span></span>
+        </label>
+        <label className={cn("flex items-start gap-3", (!pro || !whatsappReady) && "opacity-70")}>
+          {whatsappReady && <input type="hidden" name="whatsappRemindersShown" value="1" />}
+          <input type="checkbox" name="whatsappReminders" defaultChecked={p.whatsappReminders} disabled={!whatsappReady} className="mt-1 size-5 accent-brand" />
+          <span><span className="font-semibold">Send reminders on WhatsApp too</span><span className="block text-sm text-muted">{whatsappReady ? "To the client's phone number, with the Pay now link. Clients who promised a date and missed it are reminded too." : "Automatic WhatsApp reminders are coming soon. Until then, use the WhatsApp button on each invoice."}</span></span>
         </label>
       </section>
       <SubmitButton size="lg" pending={pending}>Save settings</SubmitButton>

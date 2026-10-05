@@ -3,6 +3,7 @@ import { ChevronRight, CreditCard, Landmark, LogOut, Palette, Upload } from "luc
 import { INVOICE_TEMPLATES, templateId } from "@/lib/invoice-templates";
 import { requireBusiness } from "@/lib/auth";
 import { isPro } from "@/lib/plan";
+import { whatsappConfigured } from "@/lib/whatsapp";
 import { Badge, buttonClass, Notice, PageHeader, Panel } from "@/components/ui";
 import { ConfirmButton } from "@/components/form-bits";
 import { signOutEverywhere } from "@/app/actions/auth";
@@ -35,11 +36,12 @@ export default async function Settings({ searchParams }: { searchParams: Promise
       </div>
       <ProfileForm
         pro={isPro(b)}
+        whatsappReady={whatsappConfigured()}
         p={{
           name: b.name, legalName: b.legalName ?? "", rcNumber: b.rcNumber ?? "", entityType: b.entityType, professionalServices: b.professionalServices, payDay: b.payDay,
           email: b.email ?? "", phone: b.phone ?? "", address: b.address ?? "", city: b.city ?? "", state: b.state ?? "", tin: b.tin ?? "",
           vatRegistered: b.vatRegistered, vatRate: b.vatRate, invoicePrefix: b.invoicePrefix, paymentTermsDays: b.paymentTermsDays,
-          invoiceFooter: b.invoiceFooter ?? "", autoReminders: b.autoReminders, logo: b.logo ?? "", brandColor: b.brandColor,
+          invoiceFooter: b.invoiceFooter ?? "", autoReminders: b.autoReminders, whatsappReminders: b.whatsappReminders, logo: b.logo ?? "", brandColor: b.brandColor,
         }}
       />
 

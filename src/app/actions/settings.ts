@@ -42,6 +42,8 @@ export async function saveProfile(_: FormState, form: FormData): Promise<FormSta
       vatRegistered: str(form, "vatRegistered") === "on", vatRate,
       invoicePrefix: prefix, paymentTermsDays: [0, 7, 14, 30].includes(terms) ? terms : business.paymentTermsDays,
       invoiceFooter: str(form, "invoiceFooter") || null, autoReminders: str(form, "autoReminders") === "on",
+      // Only changed when the box is on the form (it's disabled until WhatsApp is connected).
+      ...(form.get("whatsappRemindersShown") ? { whatsappReminders: str(form, "whatsappReminders") === "on" } : {}),
       logo: logo || null, brandColor: /^#[0-9a-f]{6}$/i.test(color) ? color : business.brandColor,
     },
   });

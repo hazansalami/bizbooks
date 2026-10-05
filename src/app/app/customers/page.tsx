@@ -2,9 +2,10 @@ import Link from "next/link";
 import { Search, Users } from "lucide-react";
 import { requireBusiness } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { PAYER_LABELS, payerStats } from "@/lib/collections";
 import { balanceDue, naira } from "@/lib/money";
 import { initials } from "@/lib/utils";
-import { ButtonLink, EmptyState, PageHeader } from "@/components/ui";
+import { Badge, ButtonLink, EmptyState, PageHeader } from "@/components/ui";
 
 export const metadata = { title: "Clients" };
 
@@ -17,6 +18,7 @@ export default async function Customers({ searchParams }: { searchParams: Promis
     orderBy: { name: "asc" },
   });
   const total = await db.customer.count({ where: { businessId: business.id } });
+  const payers = await payerStats(business.id, customers.map((c) => c.id));
 
   return (
     <>
@@ -39,6 +41,7 @@ export default async function Customers({ searchParams }: { searchParams: Promis
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-semibold">{c.name}</p>
                       <p className="truncate text-sm text-muted">{c.phone || c.email || "No contact details"}</p>
+                      {(() => { const p = payers.get(c.id); return p && p.label !== "NEW" ? <Badge tone={PAYER_LABELS[p.label].tone}>{PAYER_LABELS[p.label].text}{p.avgDaysLate > 3 ? ` · ~${p.avgDaysLate}d` : ""}</Badge> : null; })()}
                     </div>
                     {owes > 0 && <p className="num text-right text-sm"><span className="block text-xs text-muted">Owes</span><span className="font-bold">{naira(owes)}</span></p>}
                   </Link>
