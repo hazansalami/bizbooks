@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import type { FullInvoice } from "@/lib/invoices";
+import { canPayOnline, payUrl, publicInvoiceUrl, type FullInvoice } from "@/lib/invoices";
 import { amountInWords, balanceDue, money } from "@/lib/money";
 import { cn, formatDate, initials } from "@/lib/utils";
 import { showsBranding } from "@/lib/plan";
@@ -136,10 +136,29 @@ function Row({ label, value }: { label: string; value: string }) {
   return <div className="flex justify-between gap-4 text-ink-soft"><dt>{label}</dt><dd>{value}</dd></div>;
 }
 
+/**
+ * A link the client can follow from the PDF, the printout or the page: straight to checkout when the business
+ * takes payments online, otherwise to the invoice page. The address is printed in full so it works on paper too.
+ * Only in the PDF and printouts: on screen the page already has its own Pay button.
+ */
+function PayLink({ d }: { d: Doc }) {
+  const { inv, isQuote, due } = d;
+  if (isQuote || due <= 0 || ["DRAFT", "VOID", "PAID", "CONVERTED"].includes(inv.status)) return null;
+  const online = canPayOnline(inv);
+  const url = online ? payUrl(inv.publicToken) : publicInvoiceUrl(inv.publicToken);
+  return (
+    <div className="paper-only mt-8 flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-xl border p-4 text-sm" style={{ borderColor: d.color }}>
+      <p className="font-semibold">{online ? "Pay online by card, transfer or USSD" : "View and pay this invoice online"}</p>
+      <a href={url} className="num break-all font-semibold underline underline-offset-2" style={{ color: shade(d.color, 0.25) }}>{url.replace(/^https?:\/\//, "")}</a>
+    </div>
+  );
+}
+
 function PayAndNotes({ d, boxed = true }: { d: Doc; boxed?: boolean }) {
   const { inv, b, banks, isQuote } = d;
   return (
     <>
+      <PayLink d={d} />
       {!isQuote && banks.length > 0 && (
         <div className={cn("mt-8 text-sm", boxed ? "rounded-xl bg-canvas p-4" : "border-t border-line pt-4")}>
           <p className="font-semibold">Make payments to</p>
