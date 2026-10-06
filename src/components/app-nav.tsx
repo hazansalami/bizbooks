@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { BadgeCent, ChevronDown, FileSignature, FileText, Home, LayoutGrid, Plus, Receipt, Users, UsersRound, X } from "lucide-react";
-import { NAV_GROUPS, type Item } from "@/lib/nav";
+import { navFor, type Item, type NavFlags } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
 
@@ -25,14 +25,14 @@ const linkClass = (on: boolean) =>
  * Sidebar, Wave-style: top-level pages with icons, and groups that expand to show their pages. The group
  * holding the current page is open unless the owner closes it; any group can be opened or closed.
  */
-export function SideNav() {
+export function SideNav({ flags = {} }: { flags?: NavFlags }) {
   const active = useActive();
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
   return (
     <nav aria-label="App" className="flex flex-col gap-4 overflow-y-auto">
       <QuickActions variant="side" />
       <ul className="flex flex-col gap-0.5">
-        {NAV_GROUPS.map((g, i) => {
+        {navFor(flags).map((g, i) => {
           if (!g.title || !g.icon || g.items.length === 1) {
             return g.items.map((item) => (
               <li key={item.href}>

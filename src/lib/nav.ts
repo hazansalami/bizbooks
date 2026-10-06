@@ -2,7 +2,9 @@ import {
   BadgeCent, BadgePercent, CalendarClock, Gift, FileSignature, FileText, Home, Landmark, LifeBuoy, LineChart, Receipt, Repeat, Settings, ShoppingCart, TrendingUp, Users, UsersRound, Wallet,
 } from "lucide-react";
 
-export type Item = { href: string; label: string; icon: typeof Home; exact?: boolean; match?: string[] };
+/** Opt-in features: their pages only appear in the menu once the business switches them on. */
+export type NavFlags = { whtTracking?: boolean; complianceTracking?: boolean };
+export type Item = { href: string; label: string; icon: typeof Home; exact?: boolean; match?: string[]; when?: keyof NavFlags };
 
 /**
  * Grouped like Wave's own product: overview first, then get paid / spend / pay your team / stay tax-ready.
@@ -38,7 +40,7 @@ export const NAV_GROUPS: { title?: string; icon?: typeof Home; items: Item[] }[]
       { href: "/app/reports", label: "Reports", icon: LineChart },
       { href: "/app/forecast", label: "Cash forecast", icon: TrendingUp },
       { href: "/app/taxes", label: "Taxes", icon: Landmark },
-      { href: "/app/wht", label: "WHT credits", icon: BadgePercent },
+      { href: "/app/wht", label: "WHT credits", icon: BadgePercent, when: "whtTracking" },
       { href: "/app/advisors", label: "Advisors", icon: LifeBuoy },
     ],
   },
@@ -46,3 +48,8 @@ export const NAV_GROUPS: { title?: string; icon?: typeof Home; items: Item[] }[]
 ];
 
 export const NAV = NAV_GROUPS.flatMap((g) => g.items);
+
+/** The menu for one business: opt-in pages left out until they're switched on. */
+export function navFor(flags: NavFlags) {
+  return NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !i.when || flags[i.when]) })).filter((g) => g.items.length);
+}

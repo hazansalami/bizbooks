@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireBusiness } from "@/lib/auth";
 import { autoMatchCredits, parseCreditCsv } from "@/lib/wht";
@@ -14,8 +15,10 @@ const done = () => { revalidatePath("/app/wht"); };
 /** Opt in (or out). Nothing is tracked or sent to clients until the owner turns this on. */
 export async function setWhtTracking(form: FormData) {
   const { business } = await requireBusiness();
-  await db.business.update({ where: { id: business.id }, data: { whtTracking: str(form, "on") === "1" } });
-  done();
+  const on = str(form, "on") === "1";
+  await db.business.update({ where: { id: business.id }, data: { whtTracking: on } });
+  revalidatePath("/app", "layout");
+  redirect(on ? "/app/wht" : "/app/taxes");
 }
 
 /** Upload the WHT credit list exported from TaxPro-Max (CSV). Duplicates (same receipt number) are skipped. */

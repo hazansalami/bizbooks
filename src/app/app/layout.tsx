@@ -20,7 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="min-h-dvh lg:grid lg:grid-cols-[16rem_1fr]">
       <aside className="no-print sticky top-0 hidden h-dvh flex-col border-r border-line bg-paper px-4 py-5 lg:flex">
         <Logo href="/app" className="mb-6 px-2" />
-        <SideNav />
+        <SideNav flags={{ whtTracking: business.whtTracking, complianceTracking: business.complianceTracking }} />
         <div className="mt-auto rounded-xl bg-canvas p-3">
           <div className="flex items-center gap-3">
             <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-full bg-brand text-sm font-bold text-white">

@@ -1,19 +1,21 @@
 import Link from "next/link";
 import { ChevronRight, LogOut } from "lucide-react";
-import { NAV_GROUPS } from "@/lib/nav";
+import { navFor } from "@/lib/nav";
+import { requireBusiness } from "@/lib/auth";
 import { InstallPrompt } from "@/components/pwa";
 import { PageHeader } from "@/components/ui";
 import { logout } from "@/app/actions/auth";
 
 export const metadata = { title: "More" };
 
-export default function More() {
+export default async function More() {
+  const { business } = await requireBusiness();
   return (
     <>
       <PageHeader title="More" />
       <InstallPrompt />
       <div className="mt-4 space-y-5">
-        {NAV_GROUPS.slice(1).map((g, i) => (
+        {navFor(business).slice(1).map((g, i) => (
           <section key={i}>
             {g.title && <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wider text-muted">{g.title}</h2>}
             <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-paper">
