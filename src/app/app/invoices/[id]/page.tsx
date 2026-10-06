@@ -10,7 +10,8 @@ import { INVOICE_STATUS, PAYMENT_METHODS } from "@/lib/constants";
 import { daysBetween, formatDate, timeAgo, whatsappLink } from "@/lib/utils";
 import { convertQuote, deleteInvoice, deletePayment, duplicateInvoice, resolveClaim, voidInvoice } from "@/app/actions/invoices";
 import { Badge, buttonClass, Notice, Panel } from "@/components/ui";
-import { ConfirmButton, PrintButton } from "@/components/form-bits";
+import { ConfirmButton } from "@/components/form-bits";
+import { DownloadPdfButton } from "@/components/pdf-download";
 import { InvoiceDocument } from "@/components/invoice-document";
 import { RecordPayment, SharePanel } from "@/components/invoice-actions";
 
@@ -111,7 +112,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
           <button className={buttonClass("secondary", "sm")}><Copy className="size-4" aria-hidden /> Duplicate</button>
         </form>
         <a href={publicInvoiceUrl(inv.publicToken)} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}><ExternalLink className="size-4" aria-hidden /> See what customer sees</a>
-        <PrintButton className={buttonClass("secondary", "sm")} />
+        <DownloadPdfButton filename={`${inv.number}.pdf`} className={buttonClass("secondary", "sm")} />
         {inv.status !== "DRAFT" && inv.status !== "VOID" && inv.status !== "PAID" && inv.status !== "CONVERTED" && (
           <form action={voidInvoice}><input type="hidden" name="id" value={inv.id} />
             <ConfirmButton message="Cancel this invoice? The customer will no longer be able to pay it." className={buttonClass("ghost", "sm", "text-danger")}><XCircle className="size-4" aria-hidden /> Cancel invoice</ConfirmButton>

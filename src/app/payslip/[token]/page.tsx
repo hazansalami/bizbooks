@@ -5,7 +5,7 @@ import { amountInWords, naira } from "@/lib/money";
 import { TAX } from "@/lib/constants";
 import { periodLabel } from "@/lib/payroll";
 import { formatDate, initials } from "@/lib/utils";
-import { PrintButton } from "@/components/form-bits";
+import { DownloadPdfButton } from "@/components/pdf-download";
 
 export const metadata: Metadata = { title: "Payslip", robots: { index: false, follow: false } };
 
@@ -20,8 +20,8 @@ export default async function Payslip({ params }: { params: Promise<{ token: str
     : [["Pension (8%)", item.pensionEmployee], ["National Housing Fund", item.nhf], ["PAYE tax", item.paye]];
 
   return (
-    <main className="min-h-dvh bg-canvas px-3 py-6 sm:py-10">
-      <article className="print-sheet mx-auto max-w-2xl rounded-2xl border border-line bg-paper p-6 shadow-sm sm:p-10">
+    <main className="min-h-dvh bg-canvas px-3 py-6 doc:py-10">
+      <article className="print-sheet mx-auto max-w-2xl rounded-2xl border border-line bg-paper p-6 shadow-sm doc:p-10">
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             {b.logo ? (
@@ -71,7 +71,7 @@ export default async function Payslip({ params }: { params: Promise<{ token: str
         )}
         {item.rentRelief > 0 && !item.payeByEmployee && <p className="mt-2 text-sm text-muted">Rent relief applied: {naira(item.rentRelief)} a month tax-free.</p>}
       </article>
-      <div className="no-print mt-4 flex justify-center"><PrintButton /></div>
+      <div className="no-print mt-4 flex justify-center"><DownloadPdfButton filename={`Payslip ${item.employee.fullName} ${item.payRun.period}.pdf`} /></div>
     </main>
   );
 }

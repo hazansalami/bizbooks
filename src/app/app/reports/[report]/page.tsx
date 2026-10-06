@@ -12,6 +12,7 @@ import { PAYMENT_METHODS } from "@/lib/constants";
 import { cn, daysBetween, formatDate } from "@/lib/utils";
 import { Badge, PageHeader, Panel } from "@/components/ui";
 import { PrintButton } from "@/components/form-bits";
+import { DownloadPdfButton } from "@/components/pdf-download";
 import { REPORT_TITLES, type ReportSlug } from "../catalog";
 
 type Props = { params: Promise<{ report: string }>; searchParams: Promise<{ period?: string; basis?: string }> };
@@ -26,7 +27,7 @@ export async function generateMetadata({ params }: Props) {
 
 function PeriodNav({ slug, period, basis }: { slug: string; period: Period; basis?: string }) {
   return (
-    <nav aria-label="Report period" className="no-print no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 py-1 sm:mx-0 sm:flex-wrap sm:px-0">
+    <nav aria-label="Report period" className="no-print no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 py-1 doc:mx-0 doc:flex-wrap doc:px-0">
       {(Object.entries(PERIODS) as [Period, string][]).map(([key, label]) => (
         <Link key={key} href={`/app/reports/${slug}?period=${key}${basis ? `&basis=${basis}` : ""}`} aria-current={period === key ? "page" : undefined}
           className={cn("inline-flex min-h-10 shrink-0 items-center rounded-full px-4 text-sm font-semibold", period === key ? "bg-ink text-white" : "bg-paper text-ink-soft ring-1 ring-line hover:ring-ink")}>
@@ -77,7 +78,7 @@ function StatementHeader({ b, title, range, note }: { b: StatementBusiness; titl
           {(b.email || b.phone) && <p className="text-sm text-muted">{[b.email, b.phone].filter(Boolean).join(" · ")}</p>}
         </div>
       </div>
-      <div className="sm:text-right">
+      <div className="doc:text-right">
         <p className="text-xl font-bold">{title}</p>
         <p className="text-sm text-ink-soft">{range}</p>
         {note && <p className="text-sm text-muted">{note}</p>}
@@ -130,7 +131,7 @@ export default async function Report({ params, searchParams }: Props) {
   // Reports written as a statement (a document to share) set this, and wrap their body in sheet().
   let statement: { title: string; note?: string } | null = null;
   const sheet = (children: React.ReactNode) => (
-    <article className="print-sheet rounded-2xl border border-line bg-paper p-5 sm:p-8">
+    <article className="print-sheet rounded-2xl border border-line bg-paper p-5 doc:p-8">
       <StatementHeader b={business} title={statement?.title ?? REPORT_TITLES[slug]} range={range} note={statement?.note} />
       {children}
     </article>
@@ -145,7 +146,7 @@ export default async function Report({ params, searchParams }: Props) {
     statement = { title: "Profit and loss statement", note: basis === "accrual" ? "Accrual basis · amounts exclude VAT" : "Cash basis · amounts exclude VAT" };
     body = (
       <>
-        <nav aria-label="Basis" className="no-print mb-4 flex gap-1 rounded-full bg-paper p-1 text-sm font-semibold ring-1 ring-line sm:w-fit">
+        <nav aria-label="Basis" className="no-print mb-4 flex gap-1 rounded-full bg-paper p-1 text-sm font-semibold ring-1 ring-line doc:w-fit">
           {[["accrual", "Accrual (invoiced)"], ["cash", "Cash (paid)"]].map(([b, l]) => (
             <Link key={b} href={`/app/reports/profit-and-loss?period=${period}&basis=${b}`} aria-current={basis === b ? "true" : undefined} className={cn("inline-flex min-h-9 flex-1 items-center justify-center whitespace-nowrap rounded-full px-4", basis === b ? "bg-ink text-white" : "text-muted")}>{l}</Link>
           ))}
@@ -223,7 +224,7 @@ export default async function Report({ params, searchParams }: Props) {
     const v = await vatSummary(id, from, to);
     body = (
       <div className="space-y-5">
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 doc:grid-cols-3">
           {[["VAT charged on invoices", v.output], ["VAT paid on expenses", v.input], [v.net >= 0 ? "Balance to pay" : "Balance to carry forward", Math.abs(v.net)]].map(([l, n], i) => (
             <Panel key={l as string} className={cn("p-4", i === 2 && "border-brand")}><p className="text-sm text-muted">{l as string}</p><p className="num text-2xl font-bold">{naira(n as number)}</p></Panel>
           ))}
@@ -365,7 +366,11 @@ export default async function Report({ params, searchParams }: Props) {
           {(slug === "profit-and-loss" || slug === "cash-flow" || slug === "transactions") && (
             <a href={`/app/reports/export?period=${period}`} download className="no-print inline-flex min-h-11 items-center gap-2 rounded-full border border-line-strong bg-paper px-5 text-[0.95rem] font-semibold hover:border-ink"><Download className="size-4" aria-hidden /> CSV</a>
           )}
-          <PrintButton className="no-print inline-flex min-h-11 items-center gap-2 rounded-full border border-line-strong bg-paper px-5 text-[0.95rem] font-semibold hover:border-ink"><Printer className="size-4" aria-hidden /> {statement ? "Print or save PDF" : "Print / PDF"}</PrintButton>
+          {statement ? (
+            <DownloadPdfButton filename={`${business.name} ${statement.title} ${range}.pdf`} className="no-print inline-flex min-h-11 items-center gap-2 rounded-full border border-line-strong bg-paper px-5 text-[0.95rem] font-semibold hover:border-ink">Download PDF</DownloadPdfButton>
+          ) : (
+            <PrintButton className="no-print inline-flex min-h-11 items-center gap-2 rounded-full border border-line-strong bg-paper px-5 text-[0.95rem] font-semibold hover:border-ink"><Printer className="size-4" aria-hidden /> Print / PDF</PrintButton>
+          )}
         </>} />
       {!NO_PERIOD.includes(slug) && <div className="mb-5"><PeriodNav slug={slug} period={period} basis={sp.basis} /></div>}
       </div>
