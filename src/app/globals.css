@@ -129,6 +129,10 @@ body {
 /* Keep brand-colour bands and table headers when printing or saving invoices as PDF. */
 .print-sheet { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .print-sheet tr { break-inside: avoid; }
+/* Shown only on paper and in downloaded PDFs (e.g. the invoice pay link). */
+.paper-only { display: none; }
+.pdf-render .paper-only { display: flex; }
+@media print { .paper-only { display: flex; } }
 .pdf-render > .print-sheet { border: none !important; box-shadow: none !important; border-radius: 0 !important; margin: 0 !important; max-width: none !important; }
 
 /* Swipeable chip rows on mobile: keep the swipe, hide the scrollbar. */
