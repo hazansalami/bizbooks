@@ -6,6 +6,7 @@ import { runSchedule } from "@/lib/recurring";
 import { clearOldRateEvents } from "@/lib/rate-limit";
 import { runPromiseChecks, whatsappReminder } from "@/lib/collections";
 import { runExpiryReminders } from "@/lib/compliance";
+import { syncAllConnections } from "@/lib/mono";
 import { runRecurringExpense } from "@/lib/recurring-expenses";
 import { runNurture } from "@/lib/nurture";
 import { emailInvoice, loadFullInvoice } from "@/lib/invoices";
@@ -187,6 +188,15 @@ export async function GET(request: NextRequest) {
     console.error("documents", e);
   }
 
+  // 5d. Bank feeds (Mono), when configured.
+  let bankFeeds = { synced: 0, failed: 0 };
+  try {
+    bankFeeds = await syncAllConnections();
+  } catch (e) {
+    out.errors++;
+    console.error("bank feeds", e);
+  }
+
   // 5b. Housekeeping: rate-limit counters older than a day are never read again.
   try {
     await clearOldRateEvents();
@@ -204,5 +214,5 @@ export async function GET(request: NextRequest) {
     console.error("nurture", e);
   }
 
-  return NextResponse.json({ ok: true, ...out, growth, nurture, promises, documents });
+  return NextResponse.json({ ok: true, ...out, growth, nurture, promises, documents, bankFeeds });
 }

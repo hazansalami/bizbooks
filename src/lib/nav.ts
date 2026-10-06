@@ -1,5 +1,5 @@
 import {
-  BadgeCent, BadgePercent, CalendarClock, ShieldCheck, Gift, FileSignature, FileText, Home, Landmark, LifeBuoy, LineChart, Receipt, Repeat, Settings, ShoppingCart, TrendingUp, Users, UsersRound, Wallet,
+  BadgeCent, BadgePercent, Banknote, CalendarClock, ShieldCheck, Gift, FileSignature, FileText, Home, Landmark, LifeBuoy, LineChart, Receipt, Repeat, Settings, ShoppingCart, TrendingUp, Users, UsersRound, Wallet,
 } from "lucide-react";
 
 /** Opt-in features: their pages only appear in the menu once the business switches them on. */
@@ -33,6 +33,7 @@ export const NAV_GROUPS: { title?: string; icon?: typeof Home; items: Item[] }[]
     ],
   },
   { title: "Pay your team", items: [{ href: "/app/payroll", label: "Payroll", icon: UsersRound }] },
+  { title: "Bank", items: [{ href: "/app/bank", label: "Bank", icon: Banknote }] },
   {
     title: "Reports & taxes",
     icon: LineChart,

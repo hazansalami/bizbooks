@@ -91,6 +91,8 @@ model Business {
   complianceTracking   Boolean           @default(false)
   whtCreditList        WhtCredit[]
   documents            CompanyDocument[]
+  bankTransactions     BankTransaction[]
+  bankConnections      BankConnection[]
   vatRate              Float             @default(7.5)
   invoicePrefix        String            @default("INV")
   nextInvoiceNo        Int               @default(1)
@@ -324,26 +326,27 @@ model InvoiceEvent {
 }
 
 model Payment {
-  id           String   @id @default(cuid())
-  businessId   String
-  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  invoiceId    String?
-  invoice      Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
-  amount       Float
+  bankTransactions BankTransaction[]
+  id               String            @id @default(cuid())
+  businessId       String
+  business         Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  invoiceId        String?
+  invoice          Invoice?          @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  amount           Float
   // BANK_TRANSFER | CASH | POS | PAYSTACK | FLUTTERWAVE | OTHER
-  method       String
+  method           String
   // Gateway reference. Unique so a webhook and a redirect can't record the same payment twice.
-  reference    String?  @unique
+  reference        String?           @unique
   // Naira per 1 unit of the invoice currency on the day the money arrived. Amount is in the invoice currency.
-  exchangeRate Float    @default(1)
+  exchangeRate     Float             @default(1)
   // BizBooks Payments: paid through our Paystack split and settled straight to the business's bank.
-  viaPlatform  Boolean  @default(false)
+  viaPlatform      Boolean           @default(false)
   // Our processing fee and Paystack's fee for this payment, both deducted before settlement (naira).
-  platformFee  Float    @default(0)
-  processorFee Float    @default(0)
-  paidAt       DateTime @default(now())
-  note         String?
-  createdAt    DateTime @default(now())
+  platformFee      Float             @default(0)
+  processorFee     Float             @default(0)
+  paidAt           DateTime          @default(now())
+  note             String?
+  createdAt        DateTime          @default(now())
 
   @@index([businessId, paidAt])
 }
@@ -398,6 +401,7 @@ model RecurringSchedule {
 }
 
 model Expense {
+  bankTransactions   BankTransaction[]
   id                 String            @id @default(cuid())
   businessId         String
   business           Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
@@ -778,4 +782,57 @@ model CompanyDocument {
   createdAt  DateTime  @default(now())
 
   @@index([businessId, kind])
+}
+
+/// A line from a bank statement (CSV upload) or a connected bank feed (Mono). Matched to a payment
+/// (money in) or an expense (money out), or ignored (transfers between own accounts, loans...).
+model BankTransaction {
+  id           String   @id @default(cuid())
+  businessId   String
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  date         DateTime
+  description  String
+  // Naira. Positive = money in, negative = money out.
+  amount       Float
+  // Balance after this line, when the statement shows it.
+  balance      Float?
+  // Which account, as the owner labelled it or the feed reports it ("GTBank ••1234").
+  account      String?
+  // CSV | MONO
+  source       String   @default("CSV")
+  // Same line imported twice (overlapping statements, feed re-sync) is skipped.
+  hash         String
+  // UNMATCHED | MATCHED | IGNORED
+  status       String   @default("UNMATCHED")
+  paymentId    String?
+  payment      Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  expenseId    String?
+  expense      Expense? @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+  // A likely open invoice (money in) or unpaid bill (money out), for one-tap confirm.
+  suggestedId  String?
+  connectionId String?
+  createdAt    DateTime @default(now())
+
+  @@unique([businessId, hash])
+  @@index([businessId, status, date])
+}
+
+/// A bank account linked through Mono for automatic statement lines.
+model BankConnection {
+  id           String    @id @default(cuid())
+  businessId   String
+  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  provider     String    @default("MONO")
+  // Our reference sent to Mono, to match the account_connected webhook to this business.
+  ref          String    @unique
+  // Mono's account id, once connected.
+  accountId    String?   @unique
+  label        String?
+  // PENDING | ACTIVE | REAUTH | DISCONNECTED
+  status       String    @default("PENDING")
+  lastSyncedAt DateTime?
+  lastError    String?
+  createdAt    DateTime  @default(now())
+
+  @@index([businessId])
 }
