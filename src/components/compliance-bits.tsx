@@ -22,14 +22,14 @@ export function DocumentUpload({ kinds, suggested }: { kinds: Kind[]; suggested?
             {kinds.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
           </Select>
         </Field>
-        <Field label={kind === "OTHER" ? "Name" : "Name (optional)"} name="title" error={e.title}>
+        <Field label="Name" name="title" error={e.title} required={kind === "OTHER"}>
           <Input name="title" defaultValue={v.title} error={e.title} placeholder={kind === "OTHER" ? "e.g. Fire safety certificate" : k.label} />
         </Field>
-        <Field label="Issued on (optional)" name="issuedAt">
+        <Field label="Issued on" name="issuedAt">
           <Input name="issuedAt" type="date" defaultValue={v.issuedAt} />
         </Field>
         {k.expires && (
-          <Field label={kind === "TCC" ? "Valid until (blank = 31 Dec of the issue year)" : "Valid until"} name="expiresAt" error={e.expiresAt}>
+          <Field label="Valid until" name="expiresAt" error={e.expiresAt} hint={kind === "TCC" ? "Leave blank for 31 December of the year it was issued." : undefined}>
             <Input name="expiresAt" type="date" defaultValue={v.expiresAt} error={e.expiresAt} />
           </Field>
         )}
