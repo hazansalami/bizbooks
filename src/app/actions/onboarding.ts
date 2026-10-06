@@ -15,7 +15,7 @@ import { attachReferral, ensureReferralCode, grantTrialBonus, startTrial } from 
 
 async function context() {
   const user = await requireUser();
-  return { user, business: user.business };
+  return { user, business: user.ownBusiness };
 }
 
 function go(step: number) {

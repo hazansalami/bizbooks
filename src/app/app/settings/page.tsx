@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, CreditCard, Landmark, LogOut, Palette, Upload } from "lucide-react";
+import { ChevronRight, CreditCard, Landmark, LogOut, Palette, Upload, UserPlus } from "lucide-react";
 import { INVOICE_TEMPLATES, templateId } from "@/lib/invoice-templates";
 import { requireBusiness } from "@/lib/auth";
 import { isPro } from "@/lib/plan";
@@ -17,10 +17,18 @@ export default async function Settings({ searchParams }: { searchParams: Promise
   return (
     <>
       <PageHeader title="Settings" />
+      {user.role !== "OWNER" && (
+        <Notice className="mb-5" title={`You're working in ${b.name} as their accountant`}>
+          Billing, the bank accounts clients pay into, payment gateways and who has access are kept for the owner.
+        </Notice>
+      )}
       <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          ["/app/settings/payments", Landmark, "How you get paid", "Bank accounts, Paystack and Flutterwave"],
-          ["/app/settings/billing", CreditCard, "Your plan", isPro(b) ? "Pro" : "Free plan"],
+          ...(user.role === "OWNER" ? [
+            ["/app/settings/payments", Landmark, "How you get paid", "Bank accounts, Paystack and Flutterwave"],
+            ["/app/settings/billing", CreditCard, "Your plan", isPro(b) ? "Pro" : "Free plan"],
+            ["/app/settings/team", UserPlus, "Your accountant", "Give your accountant their own login"],
+          ] : []),
           ["/app/settings/invoice-style", Palette, "Invoice style", `${INVOICE_TEMPLATES.find((t) => t.id === templateId(b.invoiceTemplate))!.name} · 5 styles to choose from`],
           ["/app/import", Upload, "Import from Wave or Zoho Books", "Clients, invoices and services from a CSV export"],
         ].map(([href, Icon, title, sub]) => {

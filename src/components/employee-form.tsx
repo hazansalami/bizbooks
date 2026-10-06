@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 export type EmployeeInitial = Record<string, string> & { id: string };
 
-export function EmployeeForm({ initial, payeDefault = true }: { initial?: EmployeeInitial; payeDefault?: boolean }) {
+export function EmployeeForm({ initial, payeDefault = true, canEditBank = true }: { initial?: EmployeeInitial; payeDefault?: boolean; canEditBank?: boolean }) {
   const { state, onSubmit, pending } = useFormAction<FormState>(saveEmployee, {});
   const e = state.errors ?? {};
   const v: Record<string, string> = { pension: "on", paye: payeDefault ? "on" : "", whtRate: "5", kind: "EMPLOYEE", ...initial, ...state.values };
@@ -96,11 +96,12 @@ export function EmployeeForm({ initial, payeDefault = true }: { initial?: Employ
 
         <section className="space-y-5 rounded-2xl border border-line bg-paper p-5 sm:p-6">
           <h2 className="text-lg">Where to pay them</h2>
-          <div className="grid gap-5 sm:grid-cols-3">
+          {!canEditBank && <p className="text-sm text-muted">Only the business owner can add or change bank details.</p>}
+          <fieldset disabled={!canEditBank} className="grid gap-5 disabled:opacity-60 sm:grid-cols-3">
             <Field label="Bank" name="bankName"><Select name="bankName" defaultValue={v.bankName ?? ""}><option value="">Choose</option>{BANKS.map((b) => <option key={b}>{b}</option>)}</Select></Field>
             <Field label="Account number" name="accountNumber" error={e.accountNumber}><Input name="accountNumber" inputMode="numeric" maxLength={10} defaultValue={v.accountNumber} error={e.accountNumber} className="num" /></Field>
             <Field label="Account name" name="accountName"><Input name="accountName" defaultValue={v.accountName} /></Field>
-          </div>
+          </fieldset>
         </section>
         <SubmitButton size="lg" pending={pending}>{initial ? "Save changes" : "Add to team"}</SubmitButton>
       </div>

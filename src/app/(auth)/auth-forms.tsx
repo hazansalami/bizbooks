@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { login, requestPasswordReset, resetPassword, signup } from "@/app/actions/auth";
+import { acceptInviteWithSignup } from "@/app/actions/team";
 import { SubmitButton, useFormAction, type FormState } from "@/components/form-bits";
 import { Field, Input, Notice } from "@/components/ui";
 
@@ -117,6 +118,35 @@ export function ResetPasswordForm({ token }: { token: string }) {
         <PasswordInput name="confirm" autoComplete="new-password" error={e.confirm} />
       </Field>
       <SubmitButton size="lg" className="w-full" pending={pending} pendingText="Saving…">Save new password and log in</SubmitButton>
+    </form>
+  );
+}
+
+/** An invited accountant new to BizBooks: the email is fixed by the invitation. */
+export function InviteSignupForm({ token, email }: { token: string; email: string }) {
+  const { state, onSubmit, pending } = useFormAction<FormState>(acceptInviteWithSignup, {});
+  const e = state.errors ?? {};
+  return (
+    <form onSubmit={onSubmit} className="space-y-5" noValidate>
+      {state.message && <Notice tone="danger">{state.message}</Notice>}
+      <input type="hidden" name="token" value={token} />
+      <Field label="Email address" name="email">
+        <Input name="email" value={email} readOnly className="bg-canvas" />
+      </Field>
+      <Field label="Your name" name="fullName" error={e.fullName} required>
+        <Input name="fullName" autoComplete="name" defaultValue={state.values?.fullName} required error={e.fullName} />
+      </Field>
+      <Field label="Create a password" name="password" hint="At least 8 characters." error={e.password} required>
+        <PasswordInput name="password" autoComplete="new-password" error={e.password} />
+      </Field>
+      <div>
+        <label className="flex items-start gap-3 text-sm">
+          <input type="checkbox" name="terms" required className="mt-0.5 size-5 shrink-0 accent-brand" />
+          <span>I agree to the <Link href="/terms" target="_blank" className="font-semibold text-brand underline">Terms of Service</Link> and <Link href="/privacy" target="_blank" className="font-semibold text-brand underline">Privacy Policy</Link>.</span>
+        </label>
+        {e.terms && <p role="alert" className="mt-2 text-sm font-medium text-danger">{e.terms}</p>}
+      </div>
+      <SubmitButton size="lg" className="w-full" pending={pending} pendingText="Setting up…">Create login and open the books</SubmitButton>
     </form>
   );
 }

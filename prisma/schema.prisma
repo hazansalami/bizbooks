@@ -36,6 +36,7 @@ model User {
 
   business       Business?
   passwordResets PasswordReset[]
+  memberships    Membership[]
 }
 
 /// One-time password reset links. Only a SHA-256 hash of the token is stored; links expire after an hour.
@@ -93,6 +94,8 @@ model Business {
   documents            CompanyDocument[]
   bankTransactions     BankTransaction[]
   bankConnections      BankConnection[]
+  members              Membership[]
+  invites              BusinessInvite[]
   vatRate              Float             @default(7.5)
   invoicePrefix        String            @default("INV")
   nextInvoiceNo        Int               @default(1)
@@ -833,6 +836,37 @@ model BankConnection {
   lastSyncedAt DateTime?
   lastError    String?
   createdAt    DateTime  @default(now())
+
+  @@index([businessId])
+}
+
+/// Someone other than the owner with access to a business: today, the company's accountant. They work in
+/// the books like the owner, except billing, payout bank details, payment gateways and who has access.
+model Membership {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  // ACCOUNTANT
+  role       String   @default("ACCOUNTANT")
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, businessId])
+  @@index([businessId])
+}
+
+/// An emailed invitation to become a member. Only a hash of the token is stored.
+model BusinessInvite {
+  id         String    @id @default(cuid())
+  businessId String
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  email      String
+  role       String    @default("ACCOUNTANT")
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  createdAt  DateTime  @default(now())
 
   @@index([businessId])
 }

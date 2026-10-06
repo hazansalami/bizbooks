@@ -52,6 +52,8 @@ export async function readSession() {
 export async function deleteSession() {
   const store = await cookies();
   store.delete(COOKIE);
+  // Which business an accountant was working in belongs to that sign-in too.
+  store.delete("bb_business");
 }
 
 export const SESSION_COOKIE = COOKIE;

@@ -18,7 +18,7 @@ import { dateOrNull, randomToken, str } from "@/lib/utils";
 import type { FormState } from "@/components/form-bits";
 
 export async function saveEmployee(_: FormState, form: FormData): Promise<FormState> {
-  const { business } = await requireBusiness();
+  const { user, business } = await requireBusiness();
   const values = Object.fromEntries([...form.entries()].filter(([, v]) => typeof v === "string")) as Record<string, string>;
   const id = str(form, "id");
   const errors: Record<string, string> = {};
@@ -52,6 +52,9 @@ export async function saveEmployee(_: FormState, form: FormData): Promise<FormSt
     bankName: str(form, "bankName") || null, accountNumber: accountNumber || null, accountName: str(form, "accountName") || null,
     startDate: dateOrNull(form, "startDate"),
   };
+  // Where salaries are paid is the owner's call: an accountant's edits leave bank details as they were.
+  const bankFields = ["bankName", "accountNumber", "accountName"] as const;
+  if (user.role !== "OWNER") for (const k of bankFields) delete (data as Partial<typeof data>)[k];
   if (id) {
     const e = await db.employee.findFirst({ where: { id, businessId: business.id } });
     if (!e) return { message: "Team member not found." };

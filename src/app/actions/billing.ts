@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireBusiness } from "@/lib/auth";
+import { requireOwner } from "@/lib/auth";
 import { startCheckout } from "@/lib/gateways";
 import { renewalPrice } from "@/lib/plan";
 import { saveOfferAllowed } from "@/lib/billing";
@@ -13,7 +13,7 @@ import { CANCEL_REASONS, MAX_PAUSE_MONTHS, SAVE_OFFER_DISCOUNT, SAVE_OFFER_MONTH
 
 /** Pro is paid with BizBooks' own Paystack account. There are no automatic charges: owners renew when they choose. */
 export async function startUpgrade(form: FormData) {
-  const { user, business } = await requireBusiness();
+  const { user, business } = await requireOwner();
   const key = process.env.PLATFORM_PAYSTACK_SECRET_KEY;
   if (!key) redirect("/app/settings/billing?error=billing-off");
   const months = str(form, "months") === "12" ? 12 : 1;
@@ -32,7 +32,7 @@ export async function startUpgrade(form: FormData) {
 const OFFERS = ["DISCOUNT", "PAUSE", "HELP", "FREE"] as const;
 
 export async function cancelReason(form: FormData) {
-  await requireBusiness();
+  await requireOwner();
   const reason = str(form, "reason");
   if (!CANCEL_REASONS.some((r) => r.value === reason)) redirect("/app/settings/billing/cancel");
   const details = str(form, "details").slice(0, 1000);
@@ -43,7 +43,7 @@ export async function cancelReason(form: FormData) {
 }
 
 export async function acceptSaveOffer(form: FormData) {
-  const { business } = await requireBusiness();
+  const { business } = await requireOwner();
   const offer = str(form, "offer") as (typeof OFFERS)[number];
   const reason = str(form, "reason");
   const details = str(form, "details") || null;
@@ -74,7 +74,7 @@ export async function acceptSaveOffer(form: FormData) {
 }
 
 export async function confirmCancel(form: FormData) {
-  const { business } = await requireBusiness();
+  const { business } = await requireOwner();
   await db.business.update({ where: { id: business.id }, data: { cancelAtEnd: true } });
   await db.cancellationFeedback.create({
     data: { businessId: business.id, reason: str(form, "reason") || "OTHER", details: str(form, "details") || null, outcome: "CANCELLED" },
@@ -84,13 +84,13 @@ export async function confirmCancel(form: FormData) {
 }
 
 export async function undoCancel() {
-  const { business } = await requireBusiness();
+  const { business } = await requireOwner();
   await db.business.update({ where: { id: business.id }, data: { cancelAtEnd: false } });
   revalidatePath("/app/settings/billing");
 }
 
 export async function resumeFromPause() {
-  const { business } = await requireBusiness();
+  const { business } = await requireOwner();
   if (!business.pausedUntil) return;
   const now = new Date();
   const unused = Math.max(0, Math.round((business.pausedUntil.getTime() - now.getTime()) / 86400000));
