@@ -17,7 +17,7 @@ export function DocumentUpload({ kinds, suggested }: { kinds: Kind[]; suggested?
   return (
     <form onSubmit={onSubmit} key={state.ok ? state.message : "form"} className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Document" name="kind" error={e.kind}>
+        <Field label="Document" name="kind" error={e.kind} required>
           <Select name="kind" value={kind} onChange={(ev) => setKind(ev.target.value)} error={e.kind}>
             {kinds.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
           </Select>

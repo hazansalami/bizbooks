@@ -130,7 +130,7 @@ export function InviteSignupForm({ token, email }: { token: string; email: strin
     <form onSubmit={onSubmit} className="space-y-5" noValidate>
       {state.message && <Notice tone="danger">{state.message}</Notice>}
       <input type="hidden" name="token" value={token} />
-      <Field label="Email address" name="email">
+      <Field label="Email address" name="email" required>
         <Input name="email" value={email} readOnly className="bg-canvas" />
       </Field>
       <Field label="Your name" name="fullName" error={e.fullName} required>
