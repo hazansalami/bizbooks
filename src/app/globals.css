@@ -1,6 +1,15 @@
 @import "tailwindcss";
 
 /*
+  `doc:` is `sm:` for printable documents (invoices, payslips, statements): it also switches on inside
+  `.pdf-render`, so a PDF saved on a phone gets the full A4 layout rather than the stacked phone one.
+*/
+@custom-variant doc {
+  @media (width >= 40rem) { @slot; }
+  &:where(.pdf-render *, .pdf-render) { @slot; }
+}
+
+/*
   BizBooks tokens. Light and warm by default: owners are often outdoors on a phone in bright light,
   so high contrast beats a dark "fintech" look.
   brand — money in, paid, primary actions
@@ -120,6 +129,7 @@ body {
 /* Keep brand-colour bands and table headers when printing or saving invoices as PDF. */
 .print-sheet { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .print-sheet tr { break-inside: avoid; }
+.pdf-render > .print-sheet { border: none !important; box-shadow: none !important; border-radius: 0 !important; margin: 0 !important; max-width: none !important; }
 
 /* Swipeable chip rows on mobile: keep the swipe, hide the scrollbar. */
 .no-scrollbar { scrollbar-width: none; }

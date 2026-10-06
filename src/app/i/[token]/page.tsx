@@ -10,7 +10,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { balanceDue, computeTotals, money } from "@/lib/money";
 import { formatDate } from "@/lib/utils";
 import { Notice } from "@/components/ui";
-import { PrintButton } from "@/components/form-bits";
+import { DownloadPdfButton } from "@/components/pdf-download";
 import { InvoiceDocument } from "@/components/invoice-document";
 import { PayPanel } from "./pay-panel";
 import { QuoteAccept } from "./quote-accept";
@@ -114,7 +114,7 @@ export default async function PublicInvoice({ params, searchParams }: Props) {
         <InvoiceDocument inv={inv} />
 
         <div className="no-print flex justify-center">
-          <PrintButton>{inv.status === "PAID" ? "Download receipt (PDF)" : "Download PDF"}</PrintButton>
+          <DownloadPdfButton filename={`${inv.business.name} ${inv.number}${inv.status === "PAID" ? " receipt" : ""}.pdf`}>{inv.status === "PAID" ? "Download receipt (PDF)" : "Download PDF"}</DownloadPdfButton>
         </div>
       </main>
     </div>
