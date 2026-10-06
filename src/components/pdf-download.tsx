@@ -33,8 +33,15 @@ export async function downloadPdf(filename: string, selector = ".print-sheet") {
   host.appendChild(copy);
   document.body.appendChild(host);
   let canvas: HTMLCanvasElement;
+  // Where each link sits on the laid-out copy (CSS px), so the PDF can keep them clickable.
+  let links: { url: string; x: number; y: number; w: number; h: number }[] = [];
   try {
     await document.fonts.ready;
+    const origin = copy.getBoundingClientRect();
+    links = [...copy.querySelectorAll<HTMLAnchorElement>("a[href]")]
+      .filter((a) => /^(https?|mailto|tel):/i.test(a.href))
+      .flatMap((a) => [...a.getClientRects()].map((r) => ({ url: a.href, x: r.left - origin.left, y: r.top - origin.top, w: r.width, h: r.height })))
+      .filter((l) => l.w > 0 && l.h > 0);
     canvas = await domToCanvas(copy, { scale: 2, backgroundColor: "#ffffff" });
   } finally {
     host.remove();
@@ -47,6 +54,7 @@ export async function downloadPdf(filename: string, selector = ".print-sheet") {
   const pxPerPt = canvas.width / contentW;
   const pagePx = Math.floor((pageH - MARGIN_PT * 2) * pxPerPt);
   const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  const scale = canvas.width / A4_PX;
 
   let y = 0;
   let first = true;
@@ -62,6 +70,11 @@ export async function downloadPdf(filename: string, selector = ".print-sheet") {
     slice.getContext("2d")!.drawImage(canvas, 0, y, canvas.width, end - y, 0, 0, canvas.width, end - y);
     if (!first) pdf.addPage();
     pdf.addImage(slice.toDataURL("image/jpeg", 0.92), "JPEG", MARGIN_PT, MARGIN_PT, contentW, (end - y) / pxPerPt, undefined, "FAST");
+    for (const l of links) {
+      const top = l.y * scale;
+      if (top < y || top >= end) continue;
+      pdf.link(MARGIN_PT + (l.x * scale) / pxPerPt, MARGIN_PT + (top - y) / pxPerPt, (l.w * scale) / pxPerPt, (l.h * scale) / pxPerPt, { url: l.url });
+    }
     first = false;
     y = end;
   }
