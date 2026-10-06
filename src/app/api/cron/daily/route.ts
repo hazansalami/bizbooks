@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { runSchedule } from "@/lib/recurring";
 import { clearOldRateEvents } from "@/lib/rate-limit";
 import { runPromiseChecks, whatsappReminder } from "@/lib/collections";
+import { runExpiryReminders } from "@/lib/compliance";
 import { runRecurringExpense } from "@/lib/recurring-expenses";
 import { runNurture } from "@/lib/nurture";
 import { emailInvoice, loadFullInvoice } from "@/lib/invoices";
@@ -177,6 +178,15 @@ export async function GET(request: NextRequest) {
     console.error("promises", e);
   }
 
+  // 5c. Company documents about to expire (compliance tracking).
+  let documents = { sent: 0 };
+  try {
+    documents = await runExpiryReminders(now);
+  } catch (e) {
+    out.errors++;
+    console.error("documents", e);
+  }
+
   // 5b. Housekeeping: rate-limit counters older than a day are never read again.
   try {
     await clearOldRateEvents();
@@ -194,5 +204,5 @@ export async function GET(request: NextRequest) {
     console.error("nurture", e);
   }
 
-  return NextResponse.json({ ok: true, ...out, growth, nurture, promises });
+  return NextResponse.json({ ok: true, ...out, growth, nurture, promises, documents });
 }

@@ -1,5 +1,5 @@
 import {
-  BadgeCent, BadgePercent, CalendarClock, Gift, FileSignature, FileText, Home, Landmark, LifeBuoy, LineChart, Receipt, Repeat, Settings, ShoppingCart, TrendingUp, Users, UsersRound, Wallet,
+  BadgeCent, BadgePercent, CalendarClock, ShieldCheck, Gift, FileSignature, FileText, Home, Landmark, LifeBuoy, LineChart, Receipt, Repeat, Settings, ShoppingCart, TrendingUp, Users, UsersRound, Wallet,
 } from "lucide-react";
 
 /** Opt-in features: their pages only appear in the menu once the business switches them on. */
@@ -41,6 +41,7 @@ export const NAV_GROUPS: { title?: string; icon?: typeof Home; items: Item[] }[]
       { href: "/app/forecast", label: "Cash forecast", icon: TrendingUp },
       { href: "/app/taxes", label: "Taxes", icon: Landmark },
       { href: "/app/wht", label: "WHT credits", icon: BadgePercent, when: "whtTracking" },
+      { href: "/app/compliance", label: "Compliance", icon: ShieldCheck, when: "complianceTracking" },
       { href: "/app/advisors", label: "Advisors", icon: LifeBuoy },
     ],
   },

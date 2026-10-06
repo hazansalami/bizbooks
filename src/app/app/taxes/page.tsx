@@ -9,6 +9,7 @@ import { ENTITY_TYPES, TAX } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
 import { markTaxFiled, unmarkTaxFiled } from "@/app/actions/taxes";
 import { setWhtTracking } from "@/app/actions/wht";
+import { setComplianceTracking } from "@/app/actions/compliance";
 import { db } from "@/lib/db";
 import { Badge, buttonClass, PageHeader, Panel, Stat } from "@/components/ui";
 
@@ -153,6 +154,16 @@ export default async function Taxes() {
           </Panel>
         </div>
       </section>
+
+      {!b.complianceTracking && (
+        <Panel className="mt-8 flex flex-wrap items-center justify-between gap-3 p-5">
+          <div className="max-w-xl">
+            <p className="flex items-center gap-2 font-semibold"><ShieldCheck className="size-4 text-brand" aria-hidden />Selling to big companies or government?</p>
+            <p className="mt-1 text-sm text-ink-soft">Keep your CAC, tax clearance and other certificates in one place, get warned before they expire, and send a one-PDF vendor pack with any tender.</p>
+          </div>
+          <form action={setComplianceTracking}><input type="hidden" name="on" value="1" /><button className={buttonClass("secondary", "sm")}>Set up compliance</button></form>
+        </Panel>
+      )}
 
       <p className="mt-8 flex items-center gap-2 text-sm text-muted"><CheckCircle2 className="size-4 text-brand" aria-hidden />Tip: give your accountant access to the monthly CSV from <Link href="/app/reports" className="font-semibold text-brand">Reports</Link> and filing becomes a short job.</p>
     </>

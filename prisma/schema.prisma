@@ -71,34 +71,36 @@ model Business {
   logo       String? // small data URL (≤ 200 KB)
   brandColor String  @default("#0E7A55")
 
-  currency             String    @default("NGN")
+  currency             String            @default("NGN")
   tin                  String?
-  vatRegistered        Boolean   @default(false)
+  vatRegistered        Boolean           @default(false)
   // Professional services firms can't use the small-company income tax exemption.
-  professionalServices Boolean   @default(false)
+  professionalServices Boolean           @default(false)
   // Day of the month salaries are usually paid.
-  payDay               Int       @default(25)
+  payDay               Int               @default(25)
   // Payroll default for new staff: the company deducts PAYE (true) or employees handle their own tax (false).
-  payeDefault          Boolean   @default(true)
+  payeDefault          Boolean           @default(true)
   // Cash on hand when the owner last told us (or a bank feed updated it); the forecast starts from it.
   cashBalance          Float?
   cashBalanceAt        DateTime?
   // Collections: send automatic reminders on WhatsApp too (needs the WhatsApp Cloud API configured).
-  whatsappReminders    Boolean   @default(false)
+  whatsappReminders    Boolean           @default(false)
   // Opt-in: track withholding tax clients deduct, and whether each one became a usable tax credit.
-  whtTracking          Boolean   @default(false)
+  whtTracking          Boolean           @default(false)
   // Opt-in: compliance score and vendor registration pack.
-  complianceTracking   Boolean   @default(false)
-  vatRate              Float     @default(7.5)
-  invoicePrefix        String    @default("INV")
-  nextInvoiceNo        Int       @default(1)
-  quotePrefix          String    @default("QT")
-  nextQuoteNo          Int       @default(1)
-  paymentTermsDays     Int       @default(30)
+  complianceTracking   Boolean           @default(false)
+  whtCreditList        WhtCredit[]
+  documents            CompanyDocument[]
+  vatRate              Float             @default(7.5)
+  invoicePrefix        String            @default("INV")
+  nextInvoiceNo        Int               @default(1)
+  quotePrefix          String            @default("QT")
+  nextQuoteNo          Int               @default(1)
+  paymentTermsDays     Int               @default(30)
   invoiceFooter        String?
   // Invoice look: classic | contemporary | minimal | letterhead | compact
-  invoiceTemplate      String    @default("classic")
-  autoReminders        Boolean   @default(true)
+  invoiceTemplate      String            @default("classic")
+  autoReminders        Boolean           @default(true)
 
   // Onboarding wizard: the last completed step, and when the owner finished or skipped it.
   onboardingStep Int       @default(0)
@@ -738,6 +740,7 @@ model PaymentPromise {
 model WhtCredit {
   id         String   @id @default(cuid())
   businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   // Who deducted and remitted it, as the credit list shows.
   payerName  String
   payerTin   String?
@@ -755,4 +758,24 @@ model WhtCredit {
   @@unique([businessId, source, reference])
   @@index([businessId, date])
   @@index([invoiceId])
+}
+
+/// A company document kept for compliance and vendor registration: CAC certificate, tax clearance,
+/// pension/ITF/NSITF certificates... Stored in the database (PDF or image, up to 3 MB).
+model CompanyDocument {
+  id         String    @id @default(cuid())
+  businessId String
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  // CAC_CERT | CAC_STATUS | MEMART | TCC | PENCOM | ITF | NSITF | BPP | OTHER
+  kind       String
+  title      String
+  fileName   String
+  mimeType   String
+  size       Int
+  data       Bytes
+  issuedAt   DateTime?
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([businessId, kind])
 }
