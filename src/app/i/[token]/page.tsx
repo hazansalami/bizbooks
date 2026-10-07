@@ -1,5 +1,7 @@
 import { checkReferral } from "@/lib/growth";
 import type { Metadata } from "next";
+import Link from "next/link";
+import { ensureReceipts } from "@/lib/receipts";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { CheckCircle2, CircleAlert } from "lucide-react";
@@ -50,6 +52,8 @@ export default async function PublicInvoice({ params, searchParams }: Props) {
     if (inv.business.referredById) await checkReferral(inv.businessId);
   }
 
+  if (inv.kind === "INVOICE" && inv.amountPaid > 0) await ensureReceipts(inv.id);
+  const receipts = inv.kind === "INVOICE" ? await db.payment.findMany({ where: { invoiceId: inv.id, receiptToken: { not: null } }, orderBy: { paidAt: "desc" }, select: { receiptNumber: true, receiptToken: true, amount: true, paidAt: true } }) : [];
   const due = balanceDue(inv);
   const payable = inv.kind === "INVOICE" && !["PAID", "VOID"].includes(inv.status) && due > 0;
   const gateway = pickGateway(inv);
@@ -69,7 +73,7 @@ export default async function PublicInvoice({ params, searchParams }: Props) {
         {inv.status === "PAID" && payment !== "success" && (
           <div className="no-print flex items-center gap-3 rounded-2xl bg-brand-wash p-4 text-brand-deep">
             <CheckCircle2 className="size-6 shrink-0" aria-hidden />
-            <p><strong>Paid in full{inv.paidAt ? ` on ${formatDate(inv.paidAt)}` : ""}.</strong> Keep this page as your receipt.</p>
+            <p><strong>Paid in full{inv.paidAt ? ` on ${formatDate(inv.paidAt)}` : ""}.</strong>{receipts[0] && <> Your receipt is <Link href={`/receipt/${receipts[0].receiptToken}`} className="font-semibold underline">{receipts[0].receiptNumber}</Link>.</>}</p>
           </div>
         )}
         {inv.status === "VOID" && (
@@ -111,10 +115,26 @@ export default async function PublicInvoice({ params, searchParams }: Props) {
           </div>
         )}
 
+        {receipts.length > 0 && (
+          <div className="no-print rounded-2xl border border-line bg-paper p-4">
+            <p className="text-sm font-semibold">{receipts.length === 1 ? "Your receipt" : "Your receipts"}</p>
+            <ul className="mt-2 divide-y divide-line">
+              {receipts.map((r) => (
+                <li key={r.receiptToken}>
+                  <Link href={`/receipt/${r.receiptToken}`} className="flex items-center justify-between gap-3 py-2 text-sm hover:text-brand-deep">
+                    <span><span className="num font-semibold">{r.receiptNumber}</span> <span className="text-muted">· {formatDate(r.paidAt)}</span></span>
+                    <span className="num font-semibold">{money(r.amount, inv.currency)} →</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <InvoiceDocument inv={inv} />
 
         <div className="no-print flex justify-center">
-          <DownloadPdfButton filename={`${inv.business.name} ${inv.number}${inv.status === "PAID" ? " receipt" : ""}.pdf`}>{inv.status === "PAID" ? "Download receipt (PDF)" : "Download PDF"}</DownloadPdfButton>
+          <DownloadPdfButton filename={`${inv.business.name} ${inv.number}.pdf`}>Download invoice (PDF)</DownloadPdfButton>
         </div>
       </main>
     </div>

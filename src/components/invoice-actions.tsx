@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Mail, MessageCircle, Send, Wallet, X } from "lucide-react";
-import { emailInvoiceAction, markSharedAction, recordPayment } from "@/app/actions/invoices";
+import { FileCheck2, Mail, MessageCircle, Send, Wallet, X } from "lucide-react";
+import { emailInvoiceAction, markSharedAction, recordPayment, sendReceiptAction } from "@/app/actions/invoices";
 import { CopyButton, SubmitButton, useFormAction, type FormState } from "./form-bits";
 import { buttonClass, Field, Input, Notice, Select, Textarea } from "./ui";
 import { PAYMENT_METHODS } from "@/lib/constants";
@@ -88,7 +88,7 @@ export function SharePanel({ id, whatsappHref, link, hasEmail, customerName, kin
   );
 }
 
-export function RecordPayment({ id, balance, currency = "NGN", invoiceRate = 1 }: { id: string; balance: number; currency?: string; invoiceRate?: number }) {
+export function RecordPayment({ id, balance, currency = "NGN", invoiceRate = 1, clientEmail }: { id: string; balance: number; currency?: string; invoiceRate?: number; clientEmail?: string | null }) {
   const [open, setOpen] = useState(false);
   const { state, onSubmit, pending } = useFormAction<FormState>(recordPayment, {});
   const e = state.errors ?? {};
@@ -126,10 +126,36 @@ export function RecordPayment({ id, balance, currency = "NGN", invoiceRate = 1 }
       <Field label="Note" name="note">
         <Input name="note" defaultValue={state.ok ? "" : state.values?.note} placeholder="e.g. Paid part in cash at the shop" />
       </Field>
+      {clientEmail && (
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="sendReceipt" defaultChecked className="size-4 accent-brand" />
+          Email a receipt to {clientEmail}
+        </label>
+      )}
       <div className="flex gap-2">
         <SubmitButton pending={pending}>Save payment</SubmitButton>
         <button type="button" onClick={() => setOpen(false)} className={buttonClass("ghost")}>Close</button>
       </div>
     </form>
+  );
+}
+
+/** Under each payment: open the receipt, email it, or send it on WhatsApp. */
+export function ReceiptActions({ paymentId, number, url, whatsappHref, canEmail, sentAt }: { paymentId: string; number: string; url: string; whatsappHref: string; canEmail: boolean; sentAt?: string | null }) {
+  const { state, onSubmit, pending } = useFormAction<FormState>(sendReceiptAction, {});
+  const linkClass = "inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-brand-deep hover:bg-brand-wash";
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-1">
+      <a href={url} target="_blank" rel="noopener" className={linkClass}><FileCheck2 className="size-3.5" aria-hidden /> Receipt {number}</a>
+      {canEmail && (
+        <form onSubmit={onSubmit}>
+          <input type="hidden" name="paymentId" value={paymentId} />
+          <button disabled={pending} className={linkClass}><Mail className="size-3.5" aria-hidden /> {pending ? "Sending…" : state.ok ? "Sent" : sentAt ? "Email again" : "Email"}</button>
+        </form>
+      )}
+      <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className={linkClass}><MessageCircle className="size-3.5" aria-hidden /> WhatsApp</a>
+      {state.message && !state.ok && <p className="w-full text-xs text-danger">{state.message}</p>}
+      {!state.message && sentAt && <span className="text-xs text-muted">emailed {sentAt}</span>}
+    </div>
   );
 }

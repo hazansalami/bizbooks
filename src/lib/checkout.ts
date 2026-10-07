@@ -8,6 +8,7 @@ import { GATEWAY_CURRENCIES } from "./currency";
 import { balanceDue, money, naira, round2 } from "./money";
 import { siteUrl } from "./site-url";
 import { layout, sendEmail, escapeHtml as esc } from "./email";
+import { emailReceipt } from "./receipts";
 import { PLATFORM_FEE, feeFor, startSplitCheckout, vatInFee, verifySplit } from "./platform-payments";
 
 /** Paystack first, then Flutterwave, among gateways that can charge in the invoice's currency. */
@@ -75,7 +76,7 @@ export async function settleReference(invoiceId: string, provider: Provider, ref
   const r = await applyPayment(inv.id, { amount: v.amount, method: provider, reference, paidAt: v.paidAt, note: `Paid online via ${provider === "PAYSTACK" ? "Paystack" : "Flutterwave"}` });
   if (!r.ok) await alertUnapplied(inv, v.amount, reference, r.error);
   if (r.ok && !("duplicate" in r && r.duplicate)) {
-    await notifyPaid(inv, v.amount, r.fullyPaid, `The money is in your ${provider === "PAYSTACK" ? "Paystack" : "Flutterwave"} account and will settle to your bank on your usual schedule.`);
+    await notifyPaid(inv, v.amount, r.fullyPaid, r.paymentId, `The money is in your ${provider === "PAYSTACK" ? "Paystack" : "Flutterwave"} account and will settle to your bank on your usual schedule.`);
   }
   return { ok: r.ok };
 }
@@ -115,7 +116,7 @@ export async function settlePlatformReference(invoiceId: string, reference: stri
     ]);
     if (inv.business.referredById) await checkReferral(inv.businessId);
     const settles = round2(v.amount - fees);
-    await notifyPaid(inv, v.amount, r.fullyPaid, `${naira(settles)} settles straight to your ${account.bankName} account ending ${account.accountNumber.slice(-4)} on Paystack's next settlement (fees ${naira(fees)}).`);
+    await notifyPaid(inv, v.amount, r.fullyPaid, r.paymentId, `${naira(settles)} settles straight to your ${account.bankName} account ending ${account.accountNumber.slice(-4)} on Paystack's next settlement (fees ${naira(fees)}).`);
   }
   return { ok: r.ok };
 }
@@ -142,7 +143,7 @@ async function alertUnapplied(inv: SettleInvoice, amount: number, reference: str
   await sendEmail({ to: inv.business.email || inv.business.owner.email, subject: `Action needed: payment on cancelled invoice ${inv.number}`, html, text });
 }
 
-async function notifyPaid(inv: SettleInvoice, amount: number, fullyPaid: boolean | undefined, whereMoney: string) {
+async function notifyPaid(inv: SettleInvoice, amount: number, fullyPaid: boolean | undefined, paymentId: string | undefined, whereMoney: string) {
   const to = inv.business.email || inv.business.owner.email;
   const { html, text } = layout({
     heading: `${inv.customer.name} paid ${money(amount, inv.currency)}`,
@@ -150,7 +151,10 @@ async function notifyPaid(inv: SettleInvoice, amount: number, fullyPaid: boolean
     button: { label: "View invoice", href: new URL(`/app/invoices/${inv.id}`, siteUrl()).toString() },
   });
   await sendEmail({ to, subject: `Payment received: ${money(amount, inv.currency)} for ${inv.number}`, html, text });
-  if (inv.customer.email) {
+  // The client gets their numbered receipt for this payment.
+  if (inv.customer.email && paymentId) {
+    await emailReceipt(paymentId).catch(() => null);
+  } else if (inv.customer.email) {
     const receipt = layout({
       heading: `Payment received, thank you`,
       paragraphs: [`${esc(inv.business.name)} has received your payment of <strong>${money(amount, inv.currency)}</strong> for invoice ${esc(inv.number)}.`],

@@ -1,4 +1,5 @@
 import "server-only";
+import { ensureReceipt } from "./receipts";
 import { grantTrialBonus } from "./growth";
 import { db } from "./db";
 import { Prisma } from "@/generated/prisma/client";
@@ -110,7 +111,7 @@ export async function applyPayment(invoiceId: string, p: { amount: number; metho
   const amount = round2(p.amount);
   if (!(amount > 0)) return { ok: false as const, error: "Enter an amount above zero." };
   try {
-    return await db.$transaction(async (tx) => {
+    const result = await db.$transaction(async (tx) => {
       const inv = await tx.invoice.findUnique({ where: { id: invoiceId } });
       if (!inv) return { ok: false as const, error: "Invoice not found." };
       if (inv.status === "VOID") return { ok: false as const, error: "This invoice was cancelled." };
@@ -140,6 +141,9 @@ export async function applyPayment(invoiceId: string, p: { amount: number; metho
       });
       return { ok: true as const, fullyPaid, paymentId: payment.id };
     });
+    // Every payment gets its receipt number straight away, in the order payments arrive.
+    if (result.ok && result.paymentId) await ensureReceipt(result.paymentId).catch(() => null);
+    return result;
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return { ok: true as const, duplicate: true, fullyPaid: undefined, paymentId: undefined };
     throw e;
