@@ -97,6 +97,9 @@ model Business {
   members              Membership[]
   // Last receipt number issued (RCT-0001, RCT-0002...).
   receiptCounter       Int               @default(0)
+  // Monday "your money this week" email to the owner (on unless they switch it off).
+  weeklyDigest         Boolean           @default(true)
+  lastDigestAt         DateTime?
   invites              BusinessInvite[]
   vatRate              Float             @default(7.5)
   invoicePrefix        String            @default("INV")
@@ -205,20 +208,22 @@ model Gateway {
 }
 
 model Customer {
-  id          String   @id @default(cuid())
-  businessId  String
-  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  name        String
-  contactName String?
-  email       String?
-  phone       String?
-  address     String?
-  tin         String?
-  notes       String?
+  // Private link to this client's statement of account (created the first time it's shared).
+  statementToken String?  @unique
+  id             String   @id @default(cuid())
+  businessId     String
+  business       Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name           String
+  contactName    String?
+  email          String?
+  phone          String?
+  address        String?
+  tin            String?
+  notes          String?
   // Currency this client is usually billed in; new invoices start with it.
-  currency    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  currency       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   invoices  Invoice[]
   recurring RecurringSchedule[]
