@@ -13,7 +13,8 @@ import { Badge, buttonClass, Notice, Panel } from "@/components/ui";
 import { ConfirmButton } from "@/components/form-bits";
 import { DownloadPdfButton } from "@/components/pdf-download";
 import { InvoiceDocument } from "@/components/invoice-document";
-import { RecordPayment, SharePanel } from "@/components/invoice-actions";
+import { ReceiptActions, RecordPayment, SharePanel } from "@/components/invoice-actions";
+import { ensureReceipts, receiptUrl, receiptWhatsappText } from "@/lib/receipts";
 import { PromiseForm } from "@/components/collections-bits";
 import { cancelPaymentPromise } from "@/app/actions/collections";
 import { PAYER_LABELS, payerStats, payerSummary } from "@/lib/collections";
@@ -23,7 +24,7 @@ export const metadata = { title: "Invoice" };
 const EVENT_LABELS: Record<string, string> = {
   CREATED: "Created", SENT: "Sent", VIEWED: "Opened by customer", REMINDER: "Reminder sent", PAYMENT: "Payment received",
   CLAIM: "Client says they paid", VOID: "Cancelled", CONVERTED: "Turned into invoice", ACCEPTED: "Accepted by client",
-  IMPORTED: "Imported", UNAPPLIED: "Payment needs attention", PROMISE: "Promise to pay logged", PROMISE_BROKEN: "Promised payment missed",
+  IMPORTED: "Imported", UNAPPLIED: "Payment needs attention", PROMISE: "Promise to pay logged", PROMISE_BROKEN: "Promised payment missed", RECEIPT: "Receipt sent",
 };
 
 export default async function InvoicePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ share?: string }> }) {
@@ -37,6 +38,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
     payerStats(business.id, [inv.customerId]).then((m) => m.get(inv.customerId)),
   ]);
   const promise = promises[0];
+  await ensureReceipts(id);
   const [payments, claims, events, deposits] = await Promise.all([
     db.payment.findMany({ where: { invoiceId: id }, orderBy: { paidAt: "desc" } }),
     db.paymentClaim.findMany({ where: { invoiceId: id, status: "PENDING" }, orderBy: { createdAt: "desc" } }),
@@ -107,7 +109,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
         </div>
       )}
 
-      {open && due > 0 && <div className="no-print"><RecordPayment id={inv.id} balance={due} currency={inv.currency} invoiceRate={inv.exchangeRate} /></div>}
+      {open && due > 0 && <div className="no-print"><RecordPayment id={inv.id} balance={due} currency={inv.currency} invoiceRate={inv.exchangeRate} clientEmail={inv.customer.email} /></div>}
       {open && due > 0 && !isQuote && (
         <div className="no-print space-y-2">
           {payer && payer.label !== "NEW" && (
@@ -176,6 +178,16 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
                   <div className="flex-1">
                     <p className="num font-semibold">{money(p.amount, inv.currency)}</p>{inv.currency !== "NGN" && <p className="num text-xs text-muted">≈ {naira(toNgn(p.amount, p.exchangeRate))} at ₦{p.exchangeRate.toLocaleString("en-NG")}</p>}
                     <p className="text-sm text-muted">{PAYMENT_METHODS[p.method] ?? p.method} · {formatDate(p.paidAt)}{p.note ? ` · ${p.note}` : ""}</p>
+                    {p.receiptNumber && p.receiptToken && (
+                      <ReceiptActions
+                        paymentId={p.id}
+                        number={p.receiptNumber}
+                        url={receiptUrl(p.receiptToken)}
+                        canEmail={!!inv.customer.email}
+                        sentAt={p.receiptSentAt ? formatDate(p.receiptSentAt) : null}
+                        whatsappHref={whatsappLink(inv.customer.phone, receiptWhatsappText({ number: p.receiptNumber, token: p.receiptToken, amount: money(p.amount, inv.currency), invoiceNumber: inv.number, business: inv.business.name, customer: inv.customer.name }))}
+                      />
+                    )}
                   </div>
                   {!p.reference && (
                     <form action={deletePayment}><input type="hidden" name="paymentId" value={p.id} />

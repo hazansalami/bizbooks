@@ -1,5 +1,6 @@
 "use server";
 
+import { emailReceipt } from "@/lib/receipts";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
@@ -220,8 +221,20 @@ export async function recordPayment(_: FormState, form: FormData): Promise<FormS
   const dayRate = parseAmount(str(form, "exchangeRate"));
   const r = await applyPayment(inv.id, { amount, method, paidAt: dateOrNull(form, "paidAt") ?? new Date(), note: str(form, "note") || null, exchangeRate: dayRate > 0 ? dayRate : undefined });
   if (!r.ok) return { message: r.error, values };
+  const sent = str(form, "sendReceipt") === "on" && r.paymentId ? await emailReceipt(r.paymentId) : null;
   revalidatePath(`/app/invoices/${inv.id}`);
-  return { ok: true, message: r.fullyPaid ? "Payment recorded. This invoice is now fully paid." : "Payment recorded." };
+  const base = r.fullyPaid ? "Payment recorded. This invoice is now fully paid." : "Payment recorded.";
+  return { ok: true, message: sent ? (sent.ok ? `${base} Receipt ${sent.number} emailed to ${sent.to}.` : `${base} The receipt didn't send: ${sent.error}`) : base };
+}
+
+/** Email (or re-send) the receipt for one payment. */
+export async function sendReceiptAction(_: FormState, form: FormData): Promise<FormState> {
+  const { business } = await requireBusiness();
+  const pay = await db.payment.findFirst({ where: { id: str(form, "paymentId"), businessId: business.id }, select: { id: true, invoiceId: true } });
+  if (!pay) return { message: "Payment not found." };
+  const r = await emailReceipt(pay.id);
+  if (pay.invoiceId) revalidatePath(`/app/invoices/${pay.invoiceId}`);
+  return r.ok ? { ok: true, message: `Sent to ${r.to}` } : { message: r.error };
 }
 
 export async function deletePayment(form: FormData) {

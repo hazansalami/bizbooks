@@ -95,6 +95,8 @@ model Business {
   bankTransactions     BankTransaction[]
   bankConnections      BankConnection[]
   members              Membership[]
+  // Last receipt number issued (RCT-0001, RCT-0002...).
+  receiptCounter       Int               @default(0)
   invites              BusinessInvite[]
   vatRate              Float             @default(7.5)
   invoicePrefix        String            @default("INV")
@@ -349,6 +351,10 @@ model Payment {
   processorFee     Float             @default(0)
   paidAt           DateTime          @default(now())
   note             String?
+  // The client's receipt for this payment: "RCT-0007", its private link, and when it was emailed.
+  receiptNumber    String?
+  receiptToken     String?           @unique
+  receiptSentAt    DateTime?
   createdAt        DateTime          @default(now())
 
   @@index([businessId, paidAt])
