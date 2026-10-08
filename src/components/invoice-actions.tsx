@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { FileCheck2, Mail, MessageCircle, Send, Wallet, X } from "lucide-react";
-import { emailInvoiceAction, markSharedAction, recordPayment, sendReceiptAction } from "@/app/actions/invoices";
+import { FileCheck2, Mail, MessageCircle, Pencil, Send, Wallet, X } from "lucide-react";
+import { editPayment, emailInvoiceAction, markSharedAction, recordPayment, sendReceiptAction } from "@/app/actions/invoices";
 import { CopyButton, SubmitButton, useFormAction, type FormState } from "./form-bits";
 import { buttonClass, Field, Input, Notice, Select, Textarea } from "./ui";
 import { PAYMENT_METHODS } from "@/lib/constants";
@@ -157,5 +157,54 @@ export function ReceiptActions({ paymentId, number, url, whatsappHref, canEmail,
       {state.message && !state.ok && <p className="w-full text-xs text-danger">{state.message}</p>}
       {!state.message && sentAt && <span className="text-xs text-muted">emailed {sentAt}</span>}
     </div>
+  );
+}
+
+/** Pencil on a payment recorded by hand: correct its amount, date, method, rate or note in place. */
+export function EditPayment({ p, currency }: { p: { id: string; amount: number; method: string; paidAt: string; note: string; exchangeRate: number }; currency: string }) {
+  const { state, onSubmit, pending } = useFormAction<FormState>(editPayment, {});
+  // Open from the moment Edit is clicked until a save succeeds (a newer state with ok) or Cancel.
+  const [openedWith, setOpenedWith] = useState<FormState | null>(null);
+  const open = openedWith !== null && !(state.ok && state !== openedWith);
+  const e = open ? state.errors ?? {} : {};
+  const v = open ? state.values ?? {} : {};
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpenedWith(state)} className="grid size-10 place-items-center rounded-lg text-muted hover:bg-line/60 hover:text-ink" aria-label="Edit payment">
+        <Pencil className="size-4" aria-hidden />
+      </button>
+    );
+  }
+  return (
+    <form onSubmit={onSubmit} className="order-last w-full space-y-3 rounded-xl border border-line bg-canvas p-3">
+      <input type="hidden" name="paymentId" value={p.id} />
+      {state.message && !state.ok && <Notice tone="danger">{state.message}</Notice>}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Field label={`Amount (${currency})`} name="amount" required error={e.amount}>
+          <Input name="amount" inputMode="decimal" defaultValue={v.amount ?? String(p.amount)} error={e.amount} className="num" />
+        </Field>
+        <Field label="How they paid" name="method" required error={e.method}>
+          <Select name="method" defaultValue={v.method ?? p.method}>
+            {Object.entries(PAYMENT_METHODS).filter(([k]) => k !== "PAYSTACK" && k !== "FLUTTERWAVE").map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+          </Select>
+        </Field>
+        <Field label="Date received" name="paidAt" required error={e.paidAt}>
+          <Input name="paidAt" type="date" defaultValue={v.paidAt ?? p.paidAt} max={dateInput(new Date())} error={e.paidAt} />
+        </Field>
+      </div>
+      {currency !== "NGN" && (
+        <Field label={`Exchange rate: ₦ per 1 ${currency}`} name="exchangeRate" error={e.exchangeRate}>
+          <Input name="exchangeRate" inputMode="decimal" defaultValue={v.exchangeRate ?? String(p.exchangeRate)} error={e.exchangeRate} className="num sm:max-w-48" />
+        </Field>
+      )}
+      <Field label="Note" name="note">
+        <Input name="note" defaultValue={v.note ?? p.note} />
+      </Field>
+      <p className="text-xs text-muted">The receipt keeps its number and link, and shows the corrected figures.</p>
+      <div className="flex gap-2">
+        <SubmitButton size="sm" pending={pending}>Save changes</SubmitButton>
+        <button type="button" onClick={() => setOpenedWith(null)} className={buttonClass("ghost", "sm")}>Cancel</button>
+      </div>
+    </form>
   );
 }

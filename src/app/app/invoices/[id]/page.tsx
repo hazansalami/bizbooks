@@ -7,13 +7,13 @@ import { db } from "@/lib/db";
 import { canPayOnline, emailDraft, loadFullInvoice, payUrl, publicInvoiceUrl, whatsappMessage } from "@/lib/invoices";
 import { balanceDue, money, naira } from "@/lib/money";
 import { INVOICE_STATUS, PAYMENT_METHODS } from "@/lib/constants";
-import { cn, daysBetween, formatDate, timeAgo, whatsappLink } from "@/lib/utils";
+import { cn, dateInput, daysBetween, formatDate, timeAgo, whatsappLink } from "@/lib/utils";
 import { convertQuote, deleteInvoice, deletePayment, duplicateInvoice, resolveClaim, voidInvoice } from "@/app/actions/invoices";
 import { Badge, buttonClass, Notice, Panel } from "@/components/ui";
 import { ConfirmButton } from "@/components/form-bits";
 import { DownloadPdfButton } from "@/components/pdf-download";
 import { InvoiceDocument } from "@/components/invoice-document";
-import { ReceiptActions, RecordPayment, SharePanel } from "@/components/invoice-actions";
+import { EditPayment, ReceiptActions, RecordPayment, SharePanel } from "@/components/invoice-actions";
 import { ensureReceipts, receiptUrl, receiptWhatsappText } from "@/lib/receipts";
 import { PromiseForm } from "@/components/collections-bits";
 import { cancelPaymentPromise } from "@/app/actions/collections";
@@ -174,7 +174,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
           {payments.length === 0 ? <p className="mt-2 text-muted">No payments yet.</p> : (
             <ul className="mt-2 divide-y divide-line">
               {payments.map((p) => (
-                <li key={p.id} className="flex items-center gap-3 py-2.5">
+                <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5">
                   <div className="flex-1">
                     <p className="num font-semibold">{money(p.amount, inv.currency)}</p>{inv.currency !== "NGN" && <p className="num text-xs text-muted">≈ {naira(toNgn(p.amount, p.exchangeRate))} at ₦{p.exchangeRate.toLocaleString("en-NG")}</p>}
                     <p className="text-sm text-muted">{PAYMENT_METHODS[p.method] ?? p.method} · {formatDate(p.paidAt)}{p.note ? ` · ${p.note}` : ""}</p>
@@ -189,6 +189,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
                       />
                     )}
                   </div>
+                  {!p.reference && <EditPayment p={{ id: p.id, amount: p.amount, method: p.method, paidAt: dateInput(p.paidAt), note: p.note ?? "", exchangeRate: p.exchangeRate }} currency={inv.currency} />}
                   {!p.reference && (
                     <form action={deletePayment}><input type="hidden" name="paymentId" value={p.id} />
                       <ConfirmButton message="Remove this payment?" className="grid size-10 place-items-center rounded-lg text-muted hover:bg-danger-wash hover:text-danger">
