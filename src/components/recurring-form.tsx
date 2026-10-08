@@ -32,6 +32,8 @@ export function RecurringForm({ customers, vatRegistered, vatRate, termsDays, in
   const [applyVat, setApplyVat] = useState(initial?.applyVat ?? vatRegistered);
   const [whtRate, setWhtRate] = useState(String(initial?.whtRate ?? 0));
   const [currency, setCurrency] = useState(initial?.currency ?? "NGN");
+  const [startAt, setStartAt] = useState(state.values?.startAt ?? initial?.startAt ?? dateInput(new Date()));
+  const [customerId, setCustomerId] = useState(state.values?.customerId ?? initial?.customerId ?? preselectCustomer ?? (customers.length ? "" : "new"));
   const [rate, setRate] = useState(initial && initial.exchangeRate !== 1 ? String(initial.exchangeRate) : "");
   const totals = useMemo(() => computeTotals(lines.map((l) => ({ description: l.description, quantity: parseAmount(l.quantity) || 0, unitPrice: parseAmount(l.unitPrice) || 0 })), 0, applyVat ? vatRate : 0, Number(whtRate)), [lines, applyVat, vatRate, whtRate]);
   const up = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -46,16 +48,30 @@ export function RecurringForm({ customers, vatRegistered, vatRate, termsDays, in
 
       <section className="space-y-4 rounded-2xl border border-line bg-paper p-4 sm:p-6">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Customer" name="customerId" required error={e.customerId}>
-            <Select name="customerId" defaultValue={state.values?.customerId ?? initial?.customerId ?? preselectCustomer ?? ""} error={e.customerId}>
-              <option value="" disabled>Choose a customer</option>
+          <Field label="Client" name="customerId" required error={customerId !== "new" ? e.customerId : undefined}>
+            <Select name="customerId" value={customerId} onChange={(ev) => setCustomerId(ev.target.value)} error={customerId !== "new" ? e.customerId : undefined}>
+              <option value="" disabled>Choose a client</option>
               {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value="new">+ Add a new client</option>
             </Select>
           </Field>
           <Field label="Name for this schedule" name="title" required error={e.title} hint="Only you see this.">
             <Input name="title" defaultValue={state.values?.title ?? initial?.title} placeholder="e.g. Monthly cleaning contract" error={e.title} />
           </Field>
         </div>
+        {customerId === "new" && (
+          <div className="grid gap-4 rounded-xl bg-canvas p-4 sm:grid-cols-3">
+            <Field label="Client name" name="newCustomerName" required error={e.customerId} className="sm:col-span-3">
+              <Input name="newCustomerName" defaultValue={state.values?.newCustomerName} error={e.customerId} autoComplete="off" />
+            </Field>
+            <Field label="Phone" name="newCustomerPhone" className="sm:col-span-1">
+              <Input name="newCustomerPhone" type="tel" inputMode="tel" defaultValue={state.values?.newCustomerPhone} />
+            </Field>
+            <Field label="Billing email" name="newCustomerEmail" hint="Needed if invoices are emailed automatically." className="sm:col-span-2">
+              <Input name="newCustomerEmail" type="email" inputMode="email" defaultValue={state.values?.newCustomerEmail} />
+            </Field>
+          </div>
+        )}
         <fieldset>
           <legend className="text-sm font-semibold">How often?</legend>
           <input type="hidden" name="frequency" value={frequency} />
@@ -68,8 +84,11 @@ export function RecurringForm({ customers, vatRegistered, vatRate, termsDays, in
           </div>
         </fieldset>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={initial ? "Next invoice date" : "First invoice date"} name="startAt" required error={e.startAt}>
-            <Input name="startAt" type="date" defaultValue={state.values?.startAt ?? initial?.startAt ?? dateInput(new Date())} error={e.startAt} />
+          <Field
+            label={initial ? "Next invoice date" : "First invoice date"} name="startAt" required error={e.startAt}
+            hint={startAt < dateInput(new Date()) ? "In the past: the invoices for dates already gone are created as soon as you save, each dated on its schedule. They're marked as issued but not emailed, so send them or mark them paid yourself." : "You can pick a past date to add invoices for periods already gone."}
+          >
+            <Input name="startAt" type="date" value={startAt} onChange={(ev) => setStartAt(ev.target.value)} error={e.startAt} />
           </Field>
           <Field label="Customer has to pay within" name="dueInDays">
             <Select name="dueInDays" defaultValue={String(initial?.dueInDays ?? termsDays)}>
