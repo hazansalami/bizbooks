@@ -150,14 +150,16 @@ export async function applyPayment(invoiceId: string, p: { amount: number; metho
   }
 }
 
-/** Recompute status after a payment is deleted. */
+/** Recompute what's paid, the status and the paid-in-full date after a payment is edited or deleted. */
 export async function refreshInvoicePaid(invoiceId: string) {
   const inv = await db.invoice.findUnique({ where: { id: invoiceId }, include: { payments: true } });
   if (!inv) return;
   const amountPaid = round2(inv.payments.reduce((s, p) => s + p.amount, 0));
   const due = balanceDue({ ...inv, amountPaid });
   const status = inv.status === "VOID" ? "VOID" : amountPaid <= 0 ? (inv.sentAt ? "SENT" : "DRAFT") : due <= 0.005 ? "PAID" : "PARTIAL";
-  await db.invoice.update({ where: { id: invoiceId }, data: { amountPaid, status, paidAt: status === "PAID" ? inv.paidAt ?? new Date() : null } });
+  // Paid in full on the day the last payment arrived.
+  const lastPaid = inv.payments.reduce<Date | null>((d, p) => (!d || p.paidAt > d ? p.paidAt : d), null);
+  await db.invoice.update({ where: { id: invoiceId }, data: { amountPaid, status, paidAt: status === "PAID" ? lastPaid ?? new Date() : null } });
 }
 
 const fullInclude = { business: { include: { bankAccounts: true, gateways: true, paymentAccount: true } }, customer: true, items: { orderBy: { position: "asc" as const } } };

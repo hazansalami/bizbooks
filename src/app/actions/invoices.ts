@@ -237,6 +237,52 @@ export async function sendReceiptAction(_: FormState, form: FormData): Promise<F
   return r.ok ? { ok: true, message: `Sent to ${r.to}` } : { message: r.error };
 }
 
+/**
+ * Correct a payment recorded by hand: amount, date, method, rate or note. Gateway payments are what the
+ * gateway reported and can't be changed. The receipt keeps its number and link and shows the new figures.
+ */
+export async function editPayment(_: FormState, form: FormData): Promise<FormState> {
+  const { business } = await requireBusiness();
+  const p = await db.payment.findFirst({ where: { id: str(form, "paymentId"), businessId: business.id }, include: { invoice: true } });
+  if (!p) return { message: "Payment not found." };
+  if (p.reference) return { message: "This payment came through a payment gateway, so it can't be edited." };
+  const values = { amount: str(form, "amount"), method: str(form, "method"), paidAt: str(form, "paidAt"), note: str(form, "note"), exchangeRate: str(form, "exchangeRate") };
+  const errors: Record<string, string> = {};
+  const amount = round2(parseAmount(values.amount));
+  if (!(amount > 0)) errors.amount = "Enter the amount received.";
+  if (!(values.method in PAYMENT_METHODS) || ["PAYSTACK", "FLUTTERWAVE"].includes(values.method)) errors.method = "Choose how they paid.";
+  const paidAt = dateOrNull(form, "paidAt");
+  if (!paidAt) errors.paidAt = "Choose the date.";
+  else if (paidAt > new Date()) errors.paidAt = "The date can't be in the future.";
+  const inv = p.invoice;
+  if (inv && amount > 0) {
+    // What's still owed if this payment weren't there.
+    const room = balanceDue({ ...inv, amountPaid: inv.amountPaid - p.amount });
+    if (amount > room + 0.005) errors.amount = `That's more than the ${money(room, inv.currency)} owed on this invoice before this payment.`;
+  }
+  const rate = inv && inv.currency !== "NGN" ? parseAmount(values.exchangeRate) : 1;
+  if (inv && inv.currency !== "NGN" && !(rate > 0)) errors.exchangeRate = `Enter how many naira 1 ${inv.currency} was worth.`;
+  if (Object.keys(errors).length) return { errors, values };
+
+  const changes = [
+    amount !== p.amount && `amount ${money(p.amount, inv?.currency)} → ${money(amount, inv?.currency)}`,
+    paidAt!.toDateString() !== p.paidAt.toDateString() && `date ${formatDate(p.paidAt)} → ${formatDate(paidAt!)}`,
+    values.method !== p.method && `method ${PAYMENT_METHODS[p.method] ?? p.method} → ${PAYMENT_METHODS[values.method]}`,
+    inv && inv.currency !== "NGN" && rate !== p.exchangeRate && `rate ₦${p.exchangeRate} → ₦${rate}`,
+  ].filter(Boolean);
+  await db.payment.update({ where: { id: p.id }, data: { amount, paidAt: paidAt!, method: values.method, note: values.note || null, exchangeRate: rate } });
+  // A bank line matched to the old amount no longer fits: send it back to "To review".
+  if (Math.abs(amount * rate - p.amount * p.exchangeRate) > 1) {
+    await db.bankTransaction.updateMany({ where: { paymentId: p.id }, data: { status: "UNMATCHED", paymentId: null } });
+  }
+  if (inv) {
+    await refreshInvoicePaid(inv.id);
+    if (changes.length) await db.invoiceEvent.create({ data: { invoiceId: inv.id, type: "NOTE", note: `Payment ${p.receiptNumber ?? ""} edited: ${changes.join(", ")}`.replace("  ", " ") } });
+    revalidatePath(`/app/invoices/${inv.id}`);
+  }
+  return { ok: true, message: changes.length ? "Payment updated." : "Saved." };
+}
+
 export async function deletePayment(form: FormData) {
   const { business } = await requireBusiness();
   const p = await db.payment.findFirst({ where: { id: str(form, "paymentId"), businessId: business.id } });
