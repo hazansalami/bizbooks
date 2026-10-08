@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "You're ready", robots: { index: fals
 
 export default async function Done() {
   const user = await requireUser();
-  const b = user.business;
+  const b = user.ownBusiness;
   if (!b) redirect("/onboarding");
   if (!b.onboardedAt) await db.business.update({ where: { id: b.id }, data: { onboardedAt: new Date() } });
   const [banks, gateways] = await Promise.all([

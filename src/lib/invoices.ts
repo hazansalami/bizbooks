@@ -114,7 +114,7 @@ export async function applyPayment(invoiceId: string, p: { amount: number; metho
       const inv = await tx.invoice.findUnique({ where: { id: invoiceId } });
       if (!inv) return { ok: false as const, error: "Invoice not found." };
       if (inv.status === "VOID") return { ok: false as const, error: "This invoice was cancelled." };
-      await tx.payment.create({
+      const payment = await tx.payment.create({
         data: {
           businessId: inv.businessId, invoiceId, amount, method: p.method, reference: p.reference ?? null,
           exchangeRate: inv.currency === "NGN" ? 1 : p.exchangeRate && p.exchangeRate > 0 ? p.exchangeRate : inv.exchangeRate,
@@ -138,10 +138,10 @@ export async function applyPayment(invoiceId: string, p: { amount: number; metho
         where: { id: invoiceId },
         data: { amountPaid, status: fullyPaid ? "PAID" : "PARTIAL", paidAt: fullyPaid ? p.paidAt ?? new Date() : null },
       });
-      return { ok: true as const, fullyPaid };
+      return { ok: true as const, fullyPaid, paymentId: payment.id };
     });
   } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return { ok: true as const, duplicate: true, fullyPaid: undefined };
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return { ok: true as const, duplicate: true, fullyPaid: undefined, paymentId: undefined };
     throw e;
   }
 }

@@ -5,6 +5,7 @@ import { requireBusiness } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { balanceDue, money, naira } from "@/lib/money";
 import { INVOICE_STATUS } from "@/lib/constants";
+import { PAYER_LABELS, payerStats, payerSummary } from "@/lib/collections";
 import { formatDate, greetingName, whatsappLink } from "@/lib/utils";
 import { deleteCustomer } from "@/app/actions/customers";
 import { Badge, ButtonLink, buttonClass, Notice, PageHeader, Panel, Stat } from "@/components/ui";
@@ -33,6 +34,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
   }
 
   const invoices = c.invoices.filter((i) => i.kind === "INVOICE" && i.status !== "VOID");
+  const payer = (await payerStats(business.id, [c.id])).get(c.id);
   // Totals in naira, so a client billed in dollars adds up correctly.
   const owes = invoices.filter((i) => ["SENT", "PARTIAL"].includes(i.status)).reduce((s, i) => s + balanceDue(i) * i.exchangeRate, 0);
   const paid = invoices.reduce((s, i) => s + i.amountPaid * i.exchangeRate, 0);
@@ -54,10 +56,14 @@ export default async function CustomerPage({ params, searchParams }: { params: P
         {c.phone && <a href={`tel:${c.phone}`} className={buttonClass("secondary", "sm")}><Phone className="size-4" aria-hidden /> Call</a>}
         {c.email && <a href={`mailto:${c.email}`} className={buttonClass("secondary", "sm")}><Mail className="size-4" aria-hidden /> {c.email}</a>}
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <Stat label="Owes you" value={naira(owes)} tone={owes > 0 ? "sun" : "neutral"} />
         <Stat label="Paid you in total" value={naira(paid)} tone="brand" />
+        <Stat label="Payment habit" value={PAYER_LABELS[payer?.label ?? "NEW"].text} tone={payer?.label === "LATE" || payer?.label === "VERY_LATE" ? "danger" : payer?.label === "ON_TIME" ? "brand" : "neutral"} hint={payerSummary(payer)} />
       </div>
+      {(payer?.label === "LATE" || payer?.label === "VERY_LATE") && (
+        <p className="mt-3 text-sm text-ink-soft">Tip: ask this client for a deposit on new work, or put shorter payment terms on their invoices.</p>
+      )}
       {c.recurring.length > 0 && (
         <p className="mt-4 text-sm text-muted">
           Billed automatically: {c.recurring.map((r) => <Link key={r.id} href={`/app/recurring/${r.id}`} className="font-semibold text-brand hover:underline">{r.title}</Link>)}

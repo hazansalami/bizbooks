@@ -45,7 +45,7 @@ export default async function PublicInvoice({ params, searchParams }: Props) {
   // fetch the page the moment it's shared, so they don't count as the client opening it.
   const viewer = await getCurrentUser();
   const ua = (await headers()).get("user-agent") ?? "";
-  if (!inv.viewedAt && viewer?.id !== inv.business.ownerId && ua && !LINK_PREVIEW_BOTS.test(ua)) {
+  if (!inv.viewedAt && viewer?.id !== inv.business.ownerId && viewer?.business?.id !== inv.businessId && ua && !LINK_PREVIEW_BOTS.test(ua)) {
     await db.invoice.update({ where: { id: inv.id }, data: { viewedAt: new Date(), events: { create: { type: "VIEWED" } } } });
     if (inv.business.referredById) await checkReferral(inv.businessId);
   }

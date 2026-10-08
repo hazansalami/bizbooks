@@ -1,6 +1,7 @@
 import "server-only";
 import { ensureReferralCode } from "./growth";
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "./db";
 import { readSession } from "./session";
@@ -13,8 +14,26 @@ export const getCurrentUser = cache(async () => {
   // (JWT iat has 1-second precision, so compare whole seconds).
   const cutoff = Math.max(user?.passwordChangedAt?.getTime() ?? 0, user?.sessionsRevokedAt?.getTime() ?? 0);
   if (cutoff && (session.issuedAt ?? 0) < Math.floor(cutoff / 1000) * 1000) return null;
-  return user;
+  if (!user) return null;
+
+  // Which business this session is working in: the user's own, or one they're a member of (an accountant
+  // looking after several companies picks one on /accountant). Membership is checked on every request.
+  const ownBusiness = user.business;
+  let business = ownBusiness;
+  let role: Role = "OWNER";
+  const active = (await cookies()).get(ACTIVE_BUSINESS_COOKIE)?.value;
+  if (active && active !== ownBusiness?.id) {
+    const m = await db.membership.findUnique({ where: { userId_businessId: { userId: user.id, businessId: active } }, include: { business: true } });
+    if (m) { business = m.business; role = "ACCOUNTANT"; }
+  } else if (!ownBusiness) {
+    const m = await db.membership.findFirst({ where: { userId: user.id }, include: { business: true }, orderBy: { createdAt: "asc" } });
+    if (m) { business = m.business; role = "ACCOUNTANT"; }
+  }
+  return { ...user, business, ownBusiness, role };
 });
+
+export type Role = "OWNER" | "ACCOUNTANT";
+export const ACTIVE_BUSINESS_COOKIE = "bb_business";
 
 export async function requireUser() {
   const user = await getCurrentUser();
@@ -37,3 +56,13 @@ export async function requireBusiness(opts: { allowOnboarding?: boolean } = {}) 
 }
 
 export type CurrentBusiness = Awaited<ReturnType<typeof requireBusiness>>["business"];
+
+/**
+ * Owner only: billing, the bank accounts clients pay into, payment gateways and who has access. An
+ * accountant can keep the books but can't redirect the company's money or its subscription.
+ */
+export async function requireOwner(opts: { allowOnboarding?: boolean } = {}) {
+  const r = await requireBusiness(opts);
+  if (r.user.role !== "OWNER") redirect("/app/settings");
+  return r;
+}

@@ -5,7 +5,7 @@ import { TRIAL } from "@/lib/constants";
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireBusiness } from "@/lib/auth";
+import { requireOwner } from "@/lib/auth";
 import { logAdmin, requireAdmin } from "@/lib/admin";
 import { layout, sendEmail, escapeHtml as esc } from "@/lib/email";
 import { siteUrl } from "@/lib/site-url";
@@ -36,7 +36,7 @@ async function bankFrom(form: FormData) {
 
 /** Step 1 in settings: look up the account name so the owner can confirm it's theirs. */
 export async function checkBankAccount(_: FormState, form: FormData): Promise<FormState> {
-  const { business } = await requireBusiness({ allowOnboarding: true });
+  const { business } = await requireOwner({ allowOnboarding: true });
   const accountNumber = str(form, "accountNumber").replace(/\D/g, "");
   const values = { bankCode: str(form, "bankCode"), accountNumber };
   const bank = await bankFrom(form);
@@ -60,7 +60,7 @@ async function notifyOwner(businessId: string, subject: string, paragraphs: stri
  * once; anything else waits for a person to review it, so settlements can't be quietly redirected.
  */
 export async function activatePayments(_: FormState, form: FormData): Promise<FormState> {
-  const { business, user } = await requireBusiness({ allowOnboarding: true });
+  const { business, user } = await requireOwner({ allowOnboarding: true });
   const values = { bankCode: str(form, "bankCode"), accountNumber: str(form, "accountNumber").replace(/\D/g, "") };
   if (!paymentsEnabled()) return { message: "BizBooks Payments isn't available yet.", values };
   if (!user.emailVerifiedAt) return { message: "Confirm your email address first: open the link we sent you (or send a new one from the banner at the top), then try again.", values };
@@ -127,7 +127,7 @@ export async function activatePayments(_: FormState, form: FormData): Promise<Fo
 }
 
 export async function setPaymentsOn(form: FormData) {
-  const { business } = await requireBusiness({ allowOnboarding: true });
+  const { business } = await requireOwner({ allowOnboarding: true });
   const a = await db.paymentAccount.findUnique({ where: { businessId: business.id } });
   if (!a) return;
   const on = str(form, "on") === "1";

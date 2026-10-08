@@ -1,5 +1,5 @@
 import { ExternalLink, ShieldCheck } from "lucide-react";
-import { requireBusiness } from "@/lib/auth";
+import { requireOwner } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { PROVIDERS, type Provider } from "@/lib/gateways";
 import { siteUrl } from "@/lib/site-url";
@@ -15,7 +15,7 @@ import { naira } from "@/lib/money";
 export const metadata = { title: "How you get paid" };
 
 export default async function PaymentSettings() {
-  const { business } = await requireBusiness();
+  const { business } = await requireOwner();
   const [banks, gateways, payAccount] = await Promise.all([
     db.bankAccount.findMany({ where: { businessId: business.id }, orderBy: { createdAt: "asc" } }),
     db.gateway.findMany({ where: { businessId: business.id } }),

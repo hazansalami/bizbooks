@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Set up your business", robots: { ind
 
 export default async function Onboarding({ searchParams }: { searchParams: Promise<{ step?: string }> }) {
   const user = await requireUser();
-  const b = user.business;
+  const b = user.ownBusiness;
   const { step: requested } = await searchParams;
 
   // No business yet: always start at step one. Otherwise resume at the requested step or where they left off.

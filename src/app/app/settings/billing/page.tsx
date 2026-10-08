@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
-import { requireBusiness } from "@/lib/auth";
+import { requireOwner } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { PLANS } from "@/lib/constants";
 import { naira } from "@/lib/money";
@@ -26,7 +26,7 @@ const MESSAGES: Record<string, { tone: "brand" | "danger" | "sun"; text: string 
 };
 
 export default async function Billing({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const { business: b } = await requireBusiness();
+  const { business: b } = await requireOwner();
   const sp = await searchParams;
   const key = sp.error ?? (sp.upgraded ? "upgraded" : sp.cancelled ? "cancelled" : sp.saved);
   const msg = key ? MESSAGES[key] : null;

@@ -4,6 +4,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { runSchedule } from "@/lib/recurring";
 import { clearOldRateEvents } from "@/lib/rate-limit";
+import { runPromiseChecks, whatsappReminder } from "@/lib/collections";
+import { runExpiryReminders } from "@/lib/compliance";
+import { syncAllConnections } from "@/lib/mono";
 import { runRecurringExpense } from "@/lib/recurring-expenses";
 import { runNurture } from "@/lib/nurture";
 import { emailInvoice, loadFullInvoice } from "@/lib/invoices";
@@ -66,7 +69,9 @@ export async function GET(request: NextRequest) {
   // 2. Automatic payment reminders (Pro).
   const open = await db.invoice.findMany({
     where: {
-      kind: "INVOICE", status: { in: ["SENT", "PARTIAL"] }, customer: { email: { not: null } }, importSource: null,
+      kind: "INVOICE", status: { in: ["SENT", "PARTIAL"] }, importSource: null,
+      // Someone to remind: an email address, or a phone number when WhatsApp reminders are on.
+      AND: [{ OR: [{ customer: { email: { not: null } } }, { customer: { phone: { not: null } }, business: { whatsappReminders: true } }] }],
       business: { autoReminders: true, plan: "PRO" },
       OR: [{ lastReminderAt: null }, { lastReminderAt: { lt: today } }],
       dueDate: { gte: addDays(today, -8), lt: addDays(today, 2) },
@@ -78,7 +83,11 @@ export async function GET(request: NextRequest) {
     if (!isPro(inv.business) || !REMINDER_DAYS.includes(daysBetween(inv.dueDate, now))) continue;
     try {
       const full = await loadFullInvoice(inv.id);
-      if (full && (await emailInvoice(full, "reminder")).ok) out.reminders++;
+      if (!full) continue;
+      const emailed = full.customer.email ? (await emailInvoice(full, "reminder")).ok : false;
+      const whatsapped = await whatsappReminder(full);
+      if (whatsapped && !emailed) await db.invoice.update({ where: { id: full.id }, data: { lastReminderAt: new Date(), reminderCount: { increment: 1 } } });
+      if (emailed || whatsapped) out.reminders++;
     } catch (e) {
       out.errors++;
       console.error("reminder", inv.id, e);
@@ -161,6 +170,33 @@ export async function GET(request: NextRequest) {
     console.error("growth", e);
   }
 
+  // 5a. Payment promises: settle kept ones, chase missed ones.
+  let promises = { kept: 0, missed: 0 };
+  try {
+    promises = await runPromiseChecks(now);
+  } catch (e) {
+    out.errors++;
+    console.error("promises", e);
+  }
+
+  // 5c. Company documents about to expire (compliance tracking).
+  let documents = { sent: 0 };
+  try {
+    documents = await runExpiryReminders(now);
+  } catch (e) {
+    out.errors++;
+    console.error("documents", e);
+  }
+
+  // 5d. Bank feeds (Mono), when configured.
+  let bankFeeds = { synced: 0, failed: 0 };
+  try {
+    bankFeeds = await syncAllConnections();
+  } catch (e) {
+    out.errors++;
+    console.error("bank feeds", e);
+  }
+
   // 5b. Housekeeping: rate-limit counters older than a day are never read again.
   try {
     await clearOldRateEvents();
@@ -178,5 +214,5 @@ export async function GET(request: NextRequest) {
     console.error("nurture", e);
   }
 
-  return NextResponse.json({ ok: true, ...out, growth, nurture });
+  return NextResponse.json({ ok: true, ...out, growth, nurture, promises, documents, bankFeeds });
 }

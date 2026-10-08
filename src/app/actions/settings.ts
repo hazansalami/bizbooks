@@ -4,7 +4,7 @@ import { grantTrialBonus } from "@/lib/growth";
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireBusiness } from "@/lib/auth";
+import { requireBusiness, requireOwner } from "@/lib/auth";
 import { addBankAccount, NUBAN, saveGateway } from "@/lib/business";
 import { str } from "@/lib/utils";
 import { templateId } from "@/lib/invoice-templates";
@@ -42,6 +42,8 @@ export async function saveProfile(_: FormState, form: FormData): Promise<FormSta
       vatRegistered: str(form, "vatRegistered") === "on", vatRate,
       invoicePrefix: prefix, paymentTermsDays: [0, 7, 14, 30].includes(terms) ? terms : business.paymentTermsDays,
       invoiceFooter: str(form, "invoiceFooter") || null, autoReminders: str(form, "autoReminders") === "on",
+      // Only changed when the box is on the form (it's disabled until WhatsApp is connected).
+      ...(form.get("whatsappRemindersShown") ? { whatsappReminders: str(form, "whatsappReminders") === "on" } : {}),
       logo: logo || null, brandColor: /^#[0-9a-f]{6}$/i.test(color) ? color : business.brandColor,
     },
   });
@@ -50,7 +52,7 @@ export async function saveProfile(_: FormState, form: FormData): Promise<FormSta
 }
 
 export async function addBankAction(_: FormState, form: FormData): Promise<FormState> {
-  const { business } = await requireBusiness();
+  const { business } = await requireOwner();
   const a = { bankName: str(form, "bankName"), accountNumber: str(form, "accountNumber").replace(/\s/g, ""), accountName: str(form, "accountName") };
   const errors: Record<string, string> = {};
   if (!a.bankName) errors.bankName = "Choose the bank.";
@@ -63,7 +65,7 @@ export async function addBankAction(_: FormState, form: FormData): Promise<FormS
 }
 
 export async function bankAction(form: FormData) {
-  const { business } = await requireBusiness();
+  const { business } = await requireOwner();
   const id = str(form, "id");
   const acct = await db.bankAccount.findFirst({ where: { id, businessId: business.id } });
   if (!acct) return;
@@ -83,7 +85,7 @@ export async function bankAction(form: FormData) {
 }
 
 export async function connectGatewayAction(_: FormState, form: FormData): Promise<FormState> {
-  const { business } = await requireBusiness();
+  const { business } = await requireOwner();
   const provider = str(form, "provider") === "FLUTTERWAVE" ? "FLUTTERWAVE" : "PAYSTACK";
   const secretKey = str(form, "secretKey");
   if (!secretKey) return { errors: { secretKey: "Paste your secret key." }, values: { provider } };
@@ -95,7 +97,7 @@ export async function connectGatewayAction(_: FormState, form: FormData): Promis
 }
 
 export async function gatewayAction(form: FormData) {
-  const { business } = await requireBusiness();
+  const { business } = await requireOwner();
   const g = await db.gateway.findFirst({ where: { id: str(form, "id"), businessId: business.id } });
   if (!g) return;
   const op = str(form, "op");

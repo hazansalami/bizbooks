@@ -8,7 +8,7 @@ import { EmployeeForm } from "@/components/employee-form";
 export const metadata = { title: "Team member" };
 
 export default async function EditEmployee({ params }: { params: Promise<{ id: string }> }) {
-  const { business } = await requireBusiness();
+  const { user, business } = await requireBusiness();
   const { id } = await params;
   const e = await db.employee.findFirst({ where: { id, businessId: business.id } });
   if (!e) notFound();
@@ -17,6 +17,7 @@ export default async function EditEmployee({ params }: { params: Promise<{ id: s
     <>
       <PageHeader title={e.fullName} back={{ href: "/app/payroll/team", label: "Team" }} />
       <EmployeeForm
+        canEditBank={user.role === "OWNER"}
         initial={{
           id: e.id, kind: e.kind, fullName: e.fullName, jobTitle: s(e.jobTitle), email: s(e.email), phone: s(e.phone),
           monthlyGross: s(e.monthlyGross), annualRent: e.annualRent ? s(e.annualRent) : "", pension: e.pension ? "on" : "", paye: e.paye ? "on" : "", nhf: e.nhf ? "on" : "",

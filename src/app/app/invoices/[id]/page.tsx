@@ -7,20 +7,23 @@ import { db } from "@/lib/db";
 import { canPayOnline, emailDraft, loadFullInvoice, payUrl, publicInvoiceUrl, whatsappMessage } from "@/lib/invoices";
 import { balanceDue, money, naira } from "@/lib/money";
 import { INVOICE_STATUS, PAYMENT_METHODS } from "@/lib/constants";
-import { daysBetween, formatDate, timeAgo, whatsappLink } from "@/lib/utils";
+import { cn, daysBetween, formatDate, timeAgo, whatsappLink } from "@/lib/utils";
 import { convertQuote, deleteInvoice, deletePayment, duplicateInvoice, resolveClaim, voidInvoice } from "@/app/actions/invoices";
 import { Badge, buttonClass, Notice, Panel } from "@/components/ui";
 import { ConfirmButton } from "@/components/form-bits";
 import { DownloadPdfButton } from "@/components/pdf-download";
 import { InvoiceDocument } from "@/components/invoice-document";
 import { RecordPayment, SharePanel } from "@/components/invoice-actions";
+import { PromiseForm } from "@/components/collections-bits";
+import { cancelPaymentPromise } from "@/app/actions/collections";
+import { PAYER_LABELS, payerStats, payerSummary } from "@/lib/collections";
 
 export const metadata = { title: "Invoice" };
 
 const EVENT_LABELS: Record<string, string> = {
   CREATED: "Created", SENT: "Sent", VIEWED: "Opened by customer", REMINDER: "Reminder sent", PAYMENT: "Payment received",
   CLAIM: "Client says they paid", VOID: "Cancelled", CONVERTED: "Turned into invoice", ACCEPTED: "Accepted by client",
-  IMPORTED: "Imported", UNAPPLIED: "Payment needs attention",
+  IMPORTED: "Imported", UNAPPLIED: "Payment needs attention", PROMISE: "Promise to pay logged", PROMISE_BROKEN: "Promised payment missed",
 };
 
 export default async function InvoicePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ share?: string }> }) {
@@ -29,6 +32,11 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
   const { share } = await searchParams;
   const inv = await loadFullInvoice(id);
   if (!inv || inv.businessId !== business.id) notFound();
+  const [promises, payer] = await Promise.all([
+    db.paymentPromise.findMany({ where: { invoiceId: id, status: { in: ["OPEN", "BROKEN"] } }, orderBy: { createdAt: "desc" }, take: 1 }),
+    payerStats(business.id, [inv.customerId]).then((m) => m.get(inv.customerId)),
+  ]);
+  const promise = promises[0];
   const [payments, claims, events, deposits] = await Promise.all([
     db.payment.findMany({ where: { invoiceId: id }, orderBy: { paidAt: "desc" } }),
     db.paymentClaim.findMany({ where: { invoiceId: id, status: "PENDING" }, orderBy: { createdAt: "desc" } }),
@@ -100,6 +108,26 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
       )}
 
       {open && due > 0 && <div className="no-print"><RecordPayment id={inv.id} balance={due} currency={inv.currency} invoiceRate={inv.exchangeRate} /></div>}
+      {open && due > 0 && !isQuote && (
+        <div className="no-print space-y-2">
+          {payer && payer.label !== "NEW" && (
+            <p className="text-sm text-muted"><Badge tone={PAYER_LABELS[payer.label].tone}>{PAYER_LABELS[payer.label].text}</Badge> {inv.customer.name}: {payerSummary(payer)}</p>
+          )}
+          {promise ? (
+            <div className={cn("flex flex-wrap items-center justify-between gap-2 rounded-xl border p-3 text-sm", promise.status === "BROKEN" ? "border-danger/40 bg-danger-wash" : "border-line bg-paper")}>
+              <span>
+                {promise.status === "BROKEN" ? "Promise missed: " : "Promised: "}
+                <strong className="num">{money(promise.amount, inv.currency)}</strong> by {formatDate(promise.promisedFor)}{promise.note ? ` · ${promise.note}` : ""}
+                {promise.chasedAt && <span className="text-muted"> · reminded {formatDate(promise.chasedAt)}</span>}
+              </span>
+              {promise.status === "OPEN" && (
+                <form action={cancelPaymentPromise}><input type="hidden" name="promiseId" value={promise.id} /><button className="text-xs font-semibold text-muted underline hover:text-ink">Remove</button></form>
+              )}
+            </div>
+          ) : null}
+          <PromiseForm id={inv.id} balance={due} currency={inv.currency} />
+        </div>
+      )}
 
       <div className="no-print flex flex-wrap gap-2">
         {isQuote && inv.status !== "CONVERTED" && inv.status !== "VOID" && (
