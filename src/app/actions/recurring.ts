@@ -9,7 +9,7 @@ import { isPro } from "@/lib/plan";
 import { FREE_RECURRING_LIMIT, FREQUENCIES } from "@/lib/constants";
 import { parseAmount, round2 } from "@/lib/money";
 import { isCurrency } from "@/lib/currency";
-import { dateOrNull, startOfDay, str } from "@/lib/utils";
+import { addDays, dateOrNull, startOfDay, str } from "@/lib/utils";
 import type { FormState } from "@/components/form-bits";
 
 export async function saveSchedule(_: FormState, form: FormData): Promise<FormState> {
@@ -25,15 +25,20 @@ export async function saveSchedule(_: FormState, form: FormData): Promise<FormSt
     }
   }
 
-  const customerId = str(form, "customerId");
-  if (!customerId || !(await db.customer.findFirst({ where: { id: customerId, businessId: business.id } }))) errors.customerId = "Choose a customer.";
+  let customerId = str(form, "customerId");
+  // "+ Add a new client" (or no clients yet): created below, once everything else checks out.
+  const newClient = customerId === "new" || !customerId;
+  if (newClient) {
+    if (str(form, "newCustomerName").length < 2) errors.customerId = "Enter the client's name.";
+  } else if (!(await db.customer.findFirst({ where: { id: customerId, businessId: business.id } }))) errors.customerId = "Choose a client.";
   const title = str(form, "title");
   if (title.length < 2) errors.title = "Give it a short name, e.g. “Monthly shop rent”.";
   const frequency = str(form, "frequency");
   if (!(frequency in FREQUENCIES)) errors.frequency = "Choose how often.";
   const startAt = dateOrNull(form, "startAt");
   if (!startAt) errors.startAt = "Choose the date of the first invoice.";
-  else if (!id && startAt < startOfDay(new Date())) errors.startAt = "Choose today or a future date.";
+  // A past start date backfills the invoices for the periods already gone (see below), up to a year back.
+  else if (startAt < addDays(startOfDay(new Date()), -366)) errors.startAt = "Start within the last year. For older invoices, import them instead.";
   const ends = str(form, "ends");
   const maxRuns = ends === "after" ? Math.round(Number(str(form, "maxRuns"))) : null;
   const endAt = ends === "on" ? dateOrNull(form, "endAt") : null;
@@ -53,6 +58,13 @@ export async function saveSchedule(_: FormState, form: FormData): Promise<FormSt
   if (currency !== "NGN" && !(exchangeRate > 0)) errors.exchangeRate = `Enter how many naira 1 ${currency} is worth.`;
   if (Object.keys(errors).length) return { errors, values };
 
+  if (newClient) {
+    const email = str(form, "newCustomerEmail").toLowerCase();
+    customerId = (await db.customer.create({
+      data: { businessId: business.id, name: str(form, "newCustomerName"), phone: str(form, "newCustomerPhone") || null, email: /^\S+@\S+\.\S+$/.test(email) ? email : null, currency: currency === "NGN" ? null : currency },
+    })).id;
+  }
+
   const data = {
     customerId, title, frequency, items, endAt, maxRuns,
     autoSend: str(form, "autoSend") === "on",
@@ -67,13 +79,27 @@ export async function saveSchedule(_: FormState, form: FormData): Promise<FormSt
     const s = await db.recurringSchedule.findFirst({ where: { id, businessId: business.id } });
     if (!s) return { message: "Schedule not found." };
     await db.recurringSchedule.update({ where: { id }, data: { ...data, nextRunAt: s.runs === 0 ? startAt! : s.nextRunAt } });
+    if (s.runs === 0) await catchUp(scheduleId);
   } else {
     scheduleId = (await db.recurringSchedule.create({ data: { ...data, businessId: business.id, nextRunAt: startAt! } })).id;
-    // Starting today: send the first one now rather than waiting for tonight's run.
-    if (startOfDay(startAt!).getTime() === startOfDay(new Date()).getTime()) await runSchedule(scheduleId);
+    await catchUp(scheduleId);
   }
   revalidatePath("/app/recurring");
   redirect(`/app/recurring/${scheduleId}`);
+}
+
+/**
+ * Backdated start: create the invoices for every period already gone, each on its own date and not
+ * emailed, then today's (which goes out as normal). Future periods are left to the daily run.
+ */
+async function catchUp(scheduleId: string) {
+  const today = startOfDay(new Date());
+  for (let i = 0; i < 400; i++) {
+    const s = await db.recurringSchedule.findUnique({ where: { id: scheduleId }, select: { status: true, nextRunAt: true } });
+    if (!s || s.status !== "ACTIVE" || startOfDay(s.nextRunAt) > today) return;
+    const past = startOfDay(s.nextRunAt) < today;
+    if (!(await runSchedule(scheduleId, { backdated: past }))) return;
+  }
 }
 
 export async function setScheduleStatus(form: FormData) {
