@@ -132,6 +132,8 @@ body {
 /* Shown only on paper and in downloaded PDFs (e.g. the invoice pay link). */
 .paper-only { display: none; }
 .pdf-render .paper-only { display: flex; }
+/* Scroll boxes (wide tables on phones) render with scrollbars in a PDF capture: lay them out flat instead. */
+.pdf-render .overflow-x-auto { overflow: visible !important; }
 @media print { .paper-only { display: flex; } }
 .pdf-render > .print-sheet { border: none !important; box-shadow: none !important; border-radius: 0 !important; margin: 0 !important; max-width: none !important; }
 

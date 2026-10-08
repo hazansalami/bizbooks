@@ -80,6 +80,7 @@ export default async function Taxes() {
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold">{o.title} <Badge tone={st.tone}>{st.label}</Badge></p>
                     <p className="text-sm text-muted">{o.filed ? `Remitted ${formatDate(o.filedAt)}` : `Due ${formatDate(o.dueDate)}`} · {o.who}</p>
+                    {o.kind === "VAT" && <Link href={`/app/taxes/vat?month=${o.period}`} className="text-sm font-semibold text-brand hover:underline">Prepare the return →</Link>}
                   </div>
                   <p className="num text-lg font-bold">{naira(o.amount)}</p>
                   <form action={o.filed ? unmarkTaxFiled : markTaxFiled}>

@@ -7,6 +7,7 @@ import { clearOldRateEvents } from "@/lib/rate-limit";
 import { runPromiseChecks, whatsappReminder } from "@/lib/collections";
 import { runExpiryReminders } from "@/lib/compliance";
 import { syncAllConnections } from "@/lib/mono";
+import { runWeeklyDigest } from "@/lib/digest";
 import { runRecurringExpense } from "@/lib/recurring-expenses";
 import { runNurture } from "@/lib/nurture";
 import { emailInvoice, loadFullInvoice } from "@/lib/invoices";
@@ -197,6 +198,15 @@ export async function GET(request: NextRequest) {
     console.error("bank feeds", e);
   }
 
+  // 5e. Monday money email.
+  let digest = { sent: 0, skipped: 0 };
+  try {
+    digest = await runWeeklyDigest(now);
+  } catch (e) {
+    out.errors++;
+    console.error("digest", e);
+  }
+
   // 5b. Housekeeping: rate-limit counters older than a day are never read again.
   try {
     await clearOldRateEvents();
@@ -214,5 +224,5 @@ export async function GET(request: NextRequest) {
     console.error("nurture", e);
   }
 
-  return NextResponse.json({ ok: true, ...out, growth, nurture, promises, documents, bankFeeds });
+  return NextResponse.json({ ok: true, ...out, growth, nurture, promises, documents, bankFeeds, digest });
 }

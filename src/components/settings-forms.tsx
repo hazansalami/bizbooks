@@ -11,7 +11,7 @@ import { ColorPicker, LogoPicker } from "@/app/onboarding/steps";
 type Profile = {
   legalName: string; rcNumber: string; entityType: string; professionalServices: boolean; payDay: number;
   name: string; email: string; phone: string; address: string; city: string; state: string; tin: string; vatRegistered: boolean; vatRate: number;
-  invoicePrefix: string; paymentTermsDays: number; invoiceFooter: string; autoReminders: boolean; whatsappReminders: boolean; logo: string; brandColor: string;
+  invoicePrefix: string; paymentTermsDays: number; invoiceFooter: string; autoReminders: boolean; whatsappReminders: boolean; weeklyDigest: boolean; logo: string; brandColor: string;
 };
 
 export function ProfileForm({ p, pro, whatsappReady = false }: { p: Profile; pro: boolean; whatsappReady?: boolean }) {
@@ -81,6 +81,10 @@ export function ProfileForm({ p, pro, whatsappReady = false }: { p: Profile; pro
           {whatsappReady && <input type="hidden" name="whatsappRemindersShown" value="1" />}
           <input type="checkbox" name="whatsappReminders" defaultChecked={p.whatsappReminders} disabled={!whatsappReady} className="mt-1 size-5 accent-brand" />
           <span><span className="font-semibold">Send reminders on WhatsApp too</span><span className="block text-sm text-muted">{whatsappReady ? "To the client's phone number, with the Pay now link. Clients who promised a date and missed it are reminded too." : "Automatic WhatsApp reminders are coming soon. Until then, use the WhatsApp button on each invoice."}</span></span>
+        </label>
+        <label className="flex items-start gap-3">
+          <input type="checkbox" name="weeklyDigest" defaultChecked={p.weeklyDigest} className="mt-1 size-5 accent-brand" />
+          <span><span className="font-semibold">Monday money email</span><span className="block text-sm text-muted">Every Monday morning: what came in and went out last week, who to chase, and what&apos;s due this week.</span></span>
         </label>
       </section>
       <SubmitButton size="lg" pending={pending}>Save settings</SubmitButton>

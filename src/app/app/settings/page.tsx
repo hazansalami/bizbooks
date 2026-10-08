@@ -49,7 +49,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
           name: b.name, legalName: b.legalName ?? "", rcNumber: b.rcNumber ?? "", entityType: b.entityType, professionalServices: b.professionalServices, payDay: b.payDay,
           email: b.email ?? "", phone: b.phone ?? "", address: b.address ?? "", city: b.city ?? "", state: b.state ?? "", tin: b.tin ?? "",
           vatRegistered: b.vatRegistered, vatRate: b.vatRate, invoicePrefix: b.invoicePrefix, paymentTermsDays: b.paymentTermsDays,
-          invoiceFooter: b.invoiceFooter ?? "", autoReminders: b.autoReminders, whatsappReminders: b.whatsappReminders, logo: b.logo ?? "", brandColor: b.brandColor,
+          invoiceFooter: b.invoiceFooter ?? "", autoReminders: b.autoReminders, whatsappReminders: b.whatsappReminders, weeklyDigest: b.weeklyDigest, logo: b.logo ?? "", brandColor: b.brandColor,
         }}
       />
 

@@ -46,6 +46,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
         back={{ href: "/app/customers", label: "Clients" }}
         actions={<>
           <Link href={`/app/customers/${id}?edit=1`} className={buttonClass("secondary")}>Edit</Link>
+          <Link href={`/app/customers/${id}/statement`} className={buttonClass("secondary")}>Statement</Link>
           <ButtonLink href={`/app/invoices/new?customer=${id}`}>New invoice</ButtonLink>
         </>}
       />

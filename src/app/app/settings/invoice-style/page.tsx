@@ -110,7 +110,7 @@ async function sampleInvoice(businessId: string): Promise<FullInvoice> {
     createdAt: issue, updatedAt: issue, items,
     customer: {
       id: "sample", businessId, name: "Arthur Group Ltd", contactName: "Head of Finance", email: "accounts@arthurgroup.ng", phone: null,
-      address: "12 Adeola Odeku Street, Victoria Island, Lagos", tin: null, notes: null, currency: null, createdAt: issue, updatedAt: issue,
+      address: "12 Adeola Odeku Street, Victoria Island, Lagos", tin: null, notes: null, currency: null, statementToken: null, createdAt: issue, updatedAt: issue,
     },
   };
 }

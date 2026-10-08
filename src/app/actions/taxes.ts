@@ -17,12 +17,12 @@ export async function markTaxFiled(form: FormData) {
     create: { businessId: business.id, kind, period, amount, reference: str(form, "reference") || null },
     update: { amount, reference: str(form, "reference") || null, paidAt: new Date() },
   });
-  revalidatePath("/app/taxes");
+  revalidatePath("/app/taxes", "layout");
   revalidatePath("/app");
 }
 
 export async function unmarkTaxFiled(form: FormData) {
   const { business } = await requireBusiness();
   await db.taxFiling.deleteMany({ where: { businessId: business.id, kind: str(form, "kind"), period: str(form, "period") } });
-  revalidatePath("/app/taxes");
+  revalidatePath("/app/taxes", "layout");
 }
