@@ -5,7 +5,7 @@ import { advance } from "./recurring";
 import { computePay, payDateFor, periodOf, periodLabel } from "./payroll";
 import { taxObligations } from "./taxes";
 import { payerStats } from "./collections";
-import { TAX_DEADLINES } from "./constants";
+import { PAYROLL_CATEGORIES, TAX_DEADLINES } from "./constants";
 import { addDays, addMonths, formatDate, startOfDay } from "./utils";
 import { paidExpensesWhere } from "./finance";
 
@@ -54,8 +54,12 @@ export async function cashForecast(business: { id: string; vatRegistered: boolea
     db.employee.findMany({ where: { businessId: id, status: "ACTIVE" } }),
     db.payRun.findMany({ where: { businessId: id, period: { gte: periodOf(addMonths(today, -1)) } }, include: { items: true } }),
     taxObligations(business, 3),
-    db.expense.findMany({ where: { ...paidExpensesWhere(id, addMonths(today, -3), today), payRunId: null, recurringExpenseId: null }, select: { amount: true } }),
+    db.expense.findMany({ where: { ...paidExpensesWhere(id, addMonths(today, -3), today), payRunId: null, recurringExpenseId: null }, select: { amount: true, category: true } }),
   ]);
+  // Salaries recorded as ordinary expenses (not through Payroll) are a monthly payment on pay day, not
+  // everyday spending.
+  const salaryExpenses = recent.filter((e) => PAYROLL_CATEGORIES.includes(e.category));
+  const everydayExpenses = recent.filter((e) => !PAYROLL_CATEGORIES.includes(e.category));
   const payers = await payerStats(id, [...new Set([...open.map((i) => i.customerId), ...schedules.map((s) => s.customerId)])]);
   const lateDays = (customerId: string) => payers.get(customerId)?.avgDaysLate ?? 0;
 
@@ -105,24 +109,42 @@ export async function cashForecast(business: { id: string; vatRegistered: boolea
   }
 
   // ---- Money out: payroll and its remittances, month by month
+  const filed = (kind: string, period: string) => taxes.some((t) => t.kind === kind && t.period === period && t.filed);
   for (let m = -1; m < 4; m++) {
     const period = periodOf(addMonths(today, m));
     const payDate = payDateFor(period, business.payDay);
     const run = runs.find((r) => r.period === period);
     // A past month nobody ran payroll for isn't money still to go out.
     if (!run && payDate < today) continue;
-    // Use the run's own figures when it exists (people not yet paid); otherwise estimate from the team.
-    const people = run ? run.items.filter((i) => !i.paidAt) : run === undefined && team.length ? team.map((e) => computePay(e)) : [];
-    if (run?.status === "PAID" || people.length === 0) continue;
-    const sum = (k: "net" | "paye" | "pensionEmployee" | "pensionEmployer" | "wht") => round2(people.reduce((s, p) => s + p[k], 0));
-    const [y, mo] = period.split("-").map(Number);
+    // The run's own figures when it exists, otherwise an estimate from the team.
+    const everyone = run ? run.items : team.length ? team.map((e) => computePay(e)) : [];
+    if (!everyone.length) continue;
     const est = !run;
     const label = periodLabel(period);
-    if (payDate >= today || run) outflows.push({ date: notBefore(payDate), label: "Payroll", sub: `${label} take-home · ${people.length} ${people.length === 1 ? "person" : "people"}`, amount: sum("net"), kind: "PAYROLL", href: run ? `/app/payroll/runs/${run.id}` : "/app/payroll", estimate: est });
-    const pension = sum("pensionEmployee") + sum("pensionEmployer");
-    if (sum("paye") > 0) outflows.push({ date: notBefore(new Date(y, mo, TAX_DEADLINES.payeDay)), label: "PAYE", sub: `${label} · to the state tax office`, amount: sum("paye"), kind: "TAX", href: "/app/taxes", estimate: est });
-    if (pension > 0) outflows.push({ date: notBefore(addWorkingDays(payDate, TAX_DEADLINES.pensionWorkingDays)), label: "Pension", sub: `${label} · staff and company`, amount: round2(pension), kind: "TAX", href: "/app/taxes", estimate: est });
-    if (sum("wht") > 0) outflows.push({ date: notBefore(new Date(y, mo, TAX_DEADLINES.whtDay)), label: "Contractor WHT", sub: label, amount: sum("wht"), kind: "TAX", href: "/app/taxes", estimate: est });
+    // Salaries: only the people not paid yet.
+    const unpaid = run ? run.items.filter((i) => !i.paidAt) : everyone;
+    const net = round2(unpaid.reduce((s, p) => s + p.net, 0));
+    if (net > 0 && (payDate >= today || run)) {
+      outflows.push({ date: notBefore(payDate), label: "Salaries", sub: `${label} take-home · ${unpaid.length} ${unpaid.length === 1 ? "person" : "people"}`, amount: net, kind: "PAYROLL", href: run ? `/app/payroll/runs/${run.id}` : "/app/payroll", estimate: est });
+    }
+    // Remittances are due the month after whoever was paid, so they count until marked as remitted on Taxes.
+    const sum = (k: "paye" | "pensionEmployee" | "pensionEmployer" | "wht") => round2(everyone.reduce((s, p) => s + p[k], 0));
+    const [y, mo] = period.split("-").map(Number);
+    const pension = round2(sum("pensionEmployee") + sum("pensionEmployer"));
+    if (sum("paye") > 0 && !filed("PAYE", period)) outflows.push({ date: notBefore(new Date(y, mo, TAX_DEADLINES.payeDay)), label: "PAYE", sub: `${label} · to the state tax office`, amount: sum("paye"), kind: "TAX", href: "/app/taxes", estimate: est });
+    if (pension > 0 && !filed("PENSION", period)) outflows.push({ date: notBefore(addWorkingDays(payDate, TAX_DEADLINES.pensionWorkingDays)), label: "Pension", sub: `${label} · staff and company`, amount: pension, kind: "TAX", href: "/app/taxes", estimate: est });
+    if (sum("wht") > 0 && !filed("WHT", period)) outflows.push({ date: notBefore(new Date(y, mo, TAX_DEADLINES.whtDay)), label: "Contractor WHT", sub: label, amount: sum("wht"), kind: "TAX", href: "/app/taxes", estimate: est });
+  }
+
+  // ---- Money out: salaries kept as ordinary expenses (no team set up in Payroll): the last three months'
+  // monthly average, on pay day.
+  if (!team.length && !runs.length && salaryExpenses.length) {
+    const monthly = round2(salaryExpenses.reduce((s, e) => s + e.amount, 0) / 3);
+    for (let m = 0; m < 4; m++) {
+      const payDate = payDateFor(periodOf(addMonths(today, m)), business.payDay);
+      if (payDate < today) continue;
+      outflows.push({ date: payDate, label: "Salaries", sub: `${periodLabel(periodOf(payDate))} · average of salaries recorded as expenses`, amount: monthly, kind: "PAYROLL", href: "/app/payroll", estimate: true });
+    }
   }
 
   // ---- Money out: VAT already worked out for past months and not yet filed
@@ -132,7 +154,7 @@ export async function cashForecast(business: { id: string; vatRegistered: boolea
   }
 
   // ---- Money out: everyday spending, at the last three months' weekly average (an estimate the owner can switch off)
-  const everydayWeekly = round2(recent.reduce((s, e) => s + e.amount, 0) / 13);
+  const everydayWeekly = round2(everydayExpenses.reduce((s, e) => s + e.amount, 0) / 13);
   if (opts.everyday && everydayWeekly > 0) {
     for (let w = 0; w < FORECAST_WEEKS; w++) outflows.push({ date: addDays(from, w * 7 + 4), label: "Everyday spending", sub: "Average of the last 3 months", amount: everydayWeekly, kind: "EVERYDAY", estimate: true });
   }
