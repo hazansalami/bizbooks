@@ -23,6 +23,16 @@ const nextConfig: NextConfig = {
   // Uploads (WHT credit lists, compliance documents) go through server actions; the default is 1 MB.
   // Vercel caps a request at 4.5 MB.
   experimental: { serverActions: { bodySizeLimit: "4mb" } },
+  // The old Vercel address forwards to the real domain, so links already sent keep working. API routes are
+  // left alone: payment webhooks registered there must not be redirected (gateways don't follow redirects).
+  async redirects() {
+    return [{
+      source: "/:path((?!api/).*)",
+      has: [{ type: "host", value: "bizbooks-rose.vercel.app" }],
+      destination: "https://www.bizbooks.name.ng/:path",
+      permanent: true,
+    }];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

@@ -10,8 +10,8 @@ export const LEGAL = {
   entity: "[Registered company name]",
   rcNumber: "[RC number]",
   address: "[Registered office address], Nigeria",
-  email: "legal@bizbooks.ng",
-  privacyEmail: "privacy@bizbooks.ng",
+  email: "legal@bizbooks.name.ng",
+  privacyEmail: "privacy@bizbooks.name.ng",
   effective: "28 September 2026",
   // Arbitration seat and governing law.
   seat: "Lagos, Nigeria",
